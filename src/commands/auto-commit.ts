@@ -1,5 +1,5 @@
 import {input, select} from "@inquirer/prompts";
-import {Command} from "@oclif/core";
+import {Command, Flags} from "@oclif/core";
 import "dotenv/config";
 import * as OpenAI from "openai";
 import {simpleGit} from "simple-git";
@@ -8,8 +8,16 @@ import {loadUserConfig} from "../utils/load-user-config.js";
 
 export default class AutoCommit extends Command {
     static description = "Erstelle automatisch Commit-Messages aus staged Files mit Feedback-Schleife";
+static flags = {
+        instruction: Flags.string({
+            char: "i",
+            description: "Gib dem Modell eine spezifische Anweisung für die Commit-Message",
+        }),
+    };
 
     async run(): Promise<void> {
+        const {flags} = await this.parse(AutoCommit);
+
         const git = simpleGit();
         const diff = await git.diff(["--cached"]);
 
@@ -21,6 +29,9 @@ export default class AutoCommit extends Command {
         const userConfig = await loadUserConfig("auto-commit");
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
+
+        // Wenn die Option -i/--instruction gesetzt ist, überschreibt sie die gespeicherte Instruction
+        const instruction = flags.instruction ?? userConfig.instruction ?? "Keep it short and conventional";
 
         const client = new OpenAI.OpenAI({
             apiKey: process.env.GROQ_API_KEY,
@@ -35,8 +46,8 @@ export default class AutoCommit extends Command {
             },
             {
                 content: `
-                    Create a commit message using following instructions and information.
-                    Instructions of User: "${userConfig.instruction ?? "Keep it short and conventional"}"
+                    Create a commit message using the following instructions and information.
+                    Instructions of User: "${instruction}"
                     Current Branch: "${currentBranch}"
                     Diffs of Staged Files:
                     ${diff}
@@ -53,7 +64,6 @@ export default class AutoCommit extends Command {
             const response = await client.chat.completions.create({
                 messages,
                 model: "llama-3.3-70b-versatile",
-                // model: "llama-3.1-8b-instant",
                 temperature: 0.1,
             });
 
@@ -81,14 +91,12 @@ export default class AutoCommit extends Command {
                     await git.commit(commitMessage);
                     this.log("✅ Commit ausgeführt!");
                     finished = true;
-
                     break;
                 }
 
                 case "cancel": {
                     this.log("🚫 Commit abgebrochen.");
                     finished = true;
-
                     break;
                 }
 
@@ -100,7 +108,6 @@ export default class AutoCommit extends Command {
                     await git.commit(userEdit);
                     this.log("✅ Commit mit eigener Message ausgeführt!");
                     finished = true;
-
                     break;
                 }
 
@@ -109,10 +116,8 @@ export default class AutoCommit extends Command {
                         message: "Formuliere dein Feedback für das LLM:",
                     });
                     messages.push({content: fb, role: "user"});
-
                     break;
                 }
-                // No default
             }
         }
         /* eslint-enable no-await-in-loop */
