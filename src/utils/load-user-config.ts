@@ -6,11 +6,9 @@ import { createEmptyConfigFile } from "./create-empty-config-file.js";
 import { getRepositoryRootPath } from "./get-repository-root-path.ts";
 
 export const loadUserConfig = async (commandId: string) => {
-    const globalConfigPath = path.join(os.homedir(), ".config/auto-commit/config.json");
+    const globalConfigPath = path.join(os.homedir(), `.config/${commandId}/config.json`);
     let globalConfig: Record<string, unknown> = {};
-
-    console.log('Global config path:', globalConfigPath);
-
+    
     if (await fs.pathExists(globalConfigPath)) {
         try {
             globalConfig = await fs.readJSON(globalConfigPath);
@@ -24,7 +22,7 @@ export const loadUserConfig = async (commandId: string) => {
     }
 
     const rootPath = await getRepositoryRootPath();
-    const configPath = path.join(rootPath, ".git/auto-commit.config.json");
+    const configPath = path.join(rootPath, `.git/${commandId}.config.json`);
     let repoConfig: Record<string, unknown> = {};
 
     if (await fs.pathExists(configPath)) {
