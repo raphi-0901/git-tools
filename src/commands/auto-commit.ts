@@ -1,10 +1,10 @@
 import {input, select} from "@inquirer/prompts";
 import {Command} from "@oclif/core";
 import "dotenv/config";
-import fs from "fs-extra";
-import path from "node:path";
 import * as OpenAI from "openai";
 import {simpleGit} from "simple-git";
+
+import {loadUserConfig} from "../utils/load-user-config.js";
 
 export default class AutoCommit extends Command {
     static description = "Erstelle automatisch Commit-Messages aus staged Files mit Feedback-Schleife";
@@ -18,21 +18,7 @@ export default class AutoCommit extends Command {
             return;
         }
 
-        const rootPath = await git.revparse(["--show-toplevel"]);
-        let userConfig: Record<string, unknown> = {};
-
-        const configPath = path.join(rootPath, ".git/auto-commit.config.json");
-        if (await fs.pathExists(configPath)) {
-            try {
-                userConfig = await fs.readJSON(configPath);
-            } catch (error) {
-                this.warn(`⚠️ Could not parse config file at ${configPath}. Using defaults.`);
-                console.error(error);
-            }
-        } else {
-            this.warn(`⚠️ Config file not found at ${configPath}. Using defaults.`);
-        }
-
+        const userConfig = await loadUserConfig("auto-commit");
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
 
