@@ -11,6 +11,7 @@
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",
+    "dotenv": "^17.2.2",
     "inquirer": "^12.9.6",
     "simple-git": "^3.28.0"
   },
