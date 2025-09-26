@@ -10,7 +10,9 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^5"
+    "@oclif/plugin-plugins": "^5",
+    "inquirer": "^12.9.6",
+    "simple-git": "^3.28.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1",
