@@ -1,22 +1,22 @@
-import {input, select} from "@inquirer/prompts";
-import {Command, Flags} from "@oclif/core";
+import { input, select } from "@inquirer/prompts";
+import { Command, Flags } from "@oclif/core";
 import "dotenv/config";
 import * as OpenAI from "openai";
-import {simpleGit} from "simple-git";
+import { simpleGit } from "simple-git";
 
-import {loadUserConfig} from "../utils/load-user-config.js";
+import { loadUserConfig } from "../utils/load-user-config.js";
 
 export default class AutoCommit extends Command {
-    static description = "Erstelle automatisch Commit-Messages aus staged Files mit Feedback-Schleife";
+    static description = "Automatically generate commit messages from staged files with feedback loop";
 static flags = {
         instruction: Flags.string({
             char: "i",
-            description: "Gib dem Modell eine spezifische Anweisung für die Commit-Message",
+            description: "Provide a specific instruction to the model for the commit message",
         }),
     };
 
     async run(): Promise<void> {
-        const {flags} = await this.parse(AutoCommit);
+        const { flags } = await this.parse(AutoCommit);
 
         const git = simpleGit();
         const diff = await git.diff(["--cached"]);
@@ -30,7 +30,7 @@ static flags = {
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
 
-        // Wenn die Option -i/--instruction gesetzt ist, überschreibt sie die gespeicherte Instruction
+        // Use the -i/--instruction flag if provided, otherwise fallback to user config
         const instruction = flags.instruction ?? userConfig.instruction ?? "Keep it short and conventional";
 
         const client = new OpenAI.OpenAI({
@@ -47,7 +47,7 @@ static flags = {
             {
                 content: `
                     Create a commit message using the following instructions and information.
-                    Instructions of User: "${instruction}"
+                    User Instructions: "${instruction}"
                     Current Branch: "${currentBranch}"
                     Diffs of Staged Files:
                     ${diff}
@@ -73,29 +73,29 @@ static flags = {
                 return;
             }
 
-            this.log("\n🤖 Vorschlag für Commit-Message:");
+            this.log("\n🤖 Suggested commit message:");
             this.log(`   ${commitMessage}\n`);
 
             const decision = await select({
                 choices: [
-                    {name: "✅ Akzeptieren und committen", value: "accept"},
-                    {name: "✍️ Selbst abändern", value: "edit"},
-                    {name: "🔁 Feedback geben", value: "feedback"},
-                    {name: "❌ Abbrechen", value: "cancel"},
+                    { name: "✅ Accept and commit", value: "accept" },
+                    { name: "✍️ Edit manually", value: "edit" },
+                    { name: "🔁 Provide feedback", value: "feedback" },
+                    { name: "❌ Cancel", value: "cancel" },
                 ],
-                message: "Was möchtest du tun?",
+                message: "What would you like to do?",
             });
 
             switch (decision) {
                 case "accept": {
                     await git.commit(commitMessage);
-                    this.log("✅ Commit ausgeführt!");
+                    this.log("✅ Commit executed!");
                     finished = true;
                     break;
                 }
 
                 case "cancel": {
-                    this.log("🚫 Commit abgebrochen.");
+                    this.log("🚫 Commit cancelled.");
                     finished = true;
                     break;
                 }
@@ -103,19 +103,19 @@ static flags = {
                 case "edit": {
                     const userEdit = await input({
                         default: commitMessage,
-                        message: "Gib deine eigene Commit-Message ein:",
+                        message: "Enter your custom commit message:",
                     });
                     await git.commit(userEdit);
-                    this.log("✅ Commit mit eigener Message ausgeführt!");
+                    this.log("✅ Commit executed with custom message!");
                     finished = true;
                     break;
                 }
 
                 case "feedback": {
                     const fb = await input({
-                        message: "Formuliere dein Feedback für das LLM:",
+                        message: "Provide your feedback for the LLM:",
                     });
-                    messages.push({content: fb, role: "user"});
+                    messages.push({ content: fb, role: "user" });
                     break;
                 }
             }
