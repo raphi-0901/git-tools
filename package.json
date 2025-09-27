@@ -12,6 +12,7 @@
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",
     "inquirer": "^12.9.6",
+    "jira.js": "^5.2.2",
     "openai": "^5.23.0",
     "simple-git": "^3.28.0"
   },
