@@ -1,22 +1,22 @@
 import { input, select } from "@inquirer/prompts";
 import { Command, Flags } from "@oclif/core";
-import "dotenv/config";
 import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
-import { loadUserConfig } from "../utils/load-user-config.js";
+import {AutoCommitConfig} from "../../types/auto-commit-config.js";
+import { loadUserConfig } from "../../utils/load-user-config.js";
 
-export default class AutoCommit extends Command {
+export default class Index extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
-static flags = {
-        instruction: Flags.string({
+    static flags = {
+        instructions: Flags.string({
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
         }),
     };
 
     async run(): Promise<void> {
-        const { flags } = await this.parse(AutoCommit);
+        const { flags } = await this.parse(Index);
 
         const git = simpleGit();
         const diff = await git.diff(["--cached"]);
@@ -26,15 +26,23 @@ static flags = {
             return;
         }
 
-        const userConfig = await loadUserConfig("auto-commit");
+        const userConfig = await loadUserConfig<Partial<AutoCommitConfig>>("auto-commit");
+        if(!userConfig.GROQ_API_KEY) {
+            this.warn("No API key found for running this command");
+            return;
+        }
+
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
 
         // Use the -i/--instruction flag if provided, otherwise fallback to user config
-        const instruction = flags.instruction ?? userConfig.instruction ?? "Keep it short and conventional";
+        const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "Keep it short and conventional";
+
+        console.log('userConfig :>>', userConfig);
+
 
         const client = new OpenAI.OpenAI({
-            apiKey: process.env.GROQ_API_KEY,
+            apiKey: userConfig.GROQ_API_KEY,
             baseURL: "https://api.groq.com/openai/v1",
         });
 
@@ -47,7 +55,7 @@ static flags = {
             {
                 content: `
                     Create a commit message using the following instructions and information.
-                    User Instructions: "${instruction}"
+                    User Instructions: "${instructions}"
                     Current Branch: "${currentBranch}"
                     Diffs of Staged Files:
                     ${diff}
