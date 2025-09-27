@@ -7,9 +7,6 @@ import { getRepositoryRootPath } from "./get-repository-root-path.ts";
 
 export async function loadUserConfig<T>(commandId: string): Promise<T> {
     const globalConfig = await loadGlobalUserConfig<T>(commandId)
-    console.log('globalConfig :>>', globalConfig);
-
-
     const localConfig = await loadLocalUserConfig<T>(commandId)
 
     return { ...globalConfig, ...localConfig };

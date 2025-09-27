@@ -37,10 +37,6 @@ export default class Index extends Command {
 
         // Use the -i/--instruction flag if provided, otherwise fallback to user config
         const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "Keep it short and conventional";
-
-        console.log('userConfig :>>', userConfig);
-
-
         const client = new OpenAI.OpenAI({
             apiKey: userConfig.GROQ_API_KEY,
             baseURL: "https://api.groq.com/openai/v1",
