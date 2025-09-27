@@ -4,9 +4,8 @@ import {
     getConfigFilePath,
     loadUserConfig,
     loadUserConfigForOutput,
-    readConfig,
     saveUserConfig
-} from "../utils/load-user-config.js";
+} from "../utils/user-config.js";
 
 export interface BaseConfigOptions {
     allowedKeys: string[];

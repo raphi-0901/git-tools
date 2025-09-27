@@ -23,7 +23,6 @@ export async function loadUserConfigForOutput<T extends Record<string, string>>(
     return { ...globalWithMarker, ...localConfig };
 }
 
-
 export async function readConfig<T>(configPath: string): Promise<T> {
     if (await fs.pathExists(configPath)) {
         try {

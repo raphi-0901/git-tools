@@ -4,7 +4,7 @@ import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
 import {AutoCommitConfig} from "../../types/auto-commit-config.js";
-import { loadUserConfig } from "../../utils/load-user-config.js";
+import { loadUserConfig } from "../../utils/user-config.js";
 
 export default class Index extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
