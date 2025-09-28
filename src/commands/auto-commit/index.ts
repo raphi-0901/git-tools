@@ -68,7 +68,7 @@ export default class Index extends Command {
             const response = await client.chat.completions.create({
                 messages,
                 model: "llama-3.3-70b-versatile",
-                temperature: 0.1,
+                temperature: 0.4,
             });
 
             commitMessage = response.choices[0]?.message?.content?.trim() ?? "";
