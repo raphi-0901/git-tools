@@ -1,11 +1,16 @@
 import {input, select} from "@inquirer/prompts";
 import {Args, Command, Flags} from "@oclif/core";
-import { Version2Client } from "jira.js";
+import {Version2Client} from "jira.js";
 import * as OpenAI from "openai";
 import {simpleGit} from "simple-git";
 
 import {AutoBranchConfig} from "../../types/auto-branch-config.js";
 import {loadUserConfig} from "../../utils/user-config.js";
+
+export type RecordKeys<T> = {
+    [K in keyof T]: T[K] extends Record<string, unknown> ? K : never
+}[keyof T];
+
 
 export default class Index extends Command {
     static args = {
@@ -18,18 +23,6 @@ export default class Index extends Command {
     static description =
         "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
-        apiKey: Flags.string({
-            description: "OpenAI API key (overrides config)",
-            env: "API_KEY",
-        }),
-        email: Flags.string({
-            description: "Email for Jira authentication (overrides config)",
-            env: "EMAIL",
-        }),
-        groqApiKey: Flags.string({
-            description: "Groq API key (overrides config)",
-            env: "GROQ_API_KEY",
-        }),
         instructions: Flags.string({
             char: "i",
             description:
@@ -37,18 +30,23 @@ export default class Index extends Command {
         }),
     };
 
-    async getIssue(issueId: string, email: string, apiToken: string) {
+    async getIssue({apiKey, email, hostname, issueId}: {
+        apiKey: string,
+        email: string,
+        hostname: string;
+        issueId: string
+    }) {
         const client = new Version2Client({
             authentication: {
                 basic: {
-                    apiToken,
+                    apiToken: apiKey,
                     email,
                 },
             },
-            host: "https://e12220836.atlassian.net",
+            host: `https://${hostname}`,
         });
 
-        const issue = await client.issues.getIssue({ issueIdOrKey: issueId });
+        const issue = await client.issues.getIssue({issueIdOrKey: issueId});
 
         return {
             description: issue.fields.description,
@@ -57,35 +55,98 @@ export default class Index extends Command {
         }
     }
 
+    parseFieldFromIssueAndConfig(field: RecordKeys<AutoBranchConfig>, options: {
+        issueIdOrLink: string,
+        userConfig: Partial<AutoBranchConfig>
+    }) {
+        if (!options.userConfig[field]) {
+            return null
+        }
+
+        try {
+            const link = new URL(options.issueIdOrLink)
+
+            return options.userConfig[field][link.hostname];
+        } catch {
+            if (!options.userConfig.DEFAULT_HOSTNAME) {
+                return null
+            }
+
+            return options.userConfig[field][options.userConfig.DEFAULT_HOSTNAME];
+        }
+    }
+
+
+    parseHostname(issueIdOrLink: string) {
+        try {
+            const link = new URL(issueIdOrLink)
+
+            return link.hostname;
+        } catch {
+            return null
+        }
+    }
+
+    parseIssueId(issueIdOrLink: string) {
+        try {
+            const link = new URL(issueIdOrLink)
+            const pathParts = link.pathname.split("/");
+
+            return pathParts.at(-1);
+
+        } catch {
+            return issueIdOrLink;
+        }
+    }
+
     async run(): Promise<void> {
-        const { args, flags } = await this.parse(Index);
+        const {args, flags} = await this.parse(Index);
         const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>("auto-branch");
 
-        const apiKey = flags.apiKey ?? userConfig.API_KEY;
-        const groqApiKey = flags.groqApiKey ?? userConfig.GROQ_API_KEY;
-        const email = flags.email ?? userConfig.EMAIL;
+        const apiKey = this.parseFieldFromIssueAndConfig("API_KEY", {
+            issueIdOrLink: args.issueId,
+            userConfig
+        });
+
+        const email = this.parseFieldFromIssueAndConfig("EMAIL", {
+            issueIdOrLink: args.issueId,
+            userConfig
+        });
+        const groqApiKey = userConfig.GROQ_API_KEY;
 
         const missing: string[] = [];
-        if (!apiKey)  {
-            missing.push("API_KEY (use --apiKey or config)");
+        if (!apiKey) {
+            missing.push("API_KEY (use config)");
         }
 
-        if (!groqApiKey)  {
-            missing.push("GROQ_API_KEY (use --groqApiKey or config)");
+        if (!groqApiKey) {
+            missing.push("GROQ_API_KEY (use config)");
         }
 
-        if (!email)  {
-            missing.push("EMAIL (use --email or config)");
+        if (!email) {
+            missing.push("EMAIL (use config)");
         }
-
-        console.log('missing :>>', missing);
-
 
         if (missing.length > 0) {
             this.error(`❌ Missing required fields:\n- ${missing.join("\n- ")}`);
         }
 
-        const issue = await this.getIssue(args.issueId, email!, apiKey!);
+        const hostname = this.parseHostname(args.issueId) ?? userConfig.DEFAULT_HOSTNAME
+        if(!hostname) {
+            this.error(`❌ No DEFAULT_HOSTNAME set and issue does not contain full url`);
+        }
+
+        const parsedIssueId = this.parseIssueId(args.issueId);
+        if (!parsedIssueId) {
+            this.error(`❌ Could not parse an issue id from ${args.issueId} or link. Please provide a valid issue id or link.`);
+        }
+
+        const issue = await this.getIssue({
+            apiKey: apiKey!,
+            email: email!,
+            hostname,
+            issueId: parsedIssueId
+        });
         console.log('issue :>>', issue);
         const git = simpleGit();
         const instructions =
@@ -123,7 +184,7 @@ export default class Index extends Command {
             const response = await client.chat.completions.create({
                 messages,
                 model: "llama-3.3-70b-versatile",
-                temperature: 0.1,
+                temperature: 0.4,
             });
 
             branchName = response.choices[0]?.message?.content?.trim() ?? "";
@@ -136,10 +197,10 @@ export default class Index extends Command {
 
             const decision = await select({
                 choices: [
-                    { name: "✅ Accept and create branch", value: "accept" },
-                    { name: "✍️ Edit manually", value: "edit" },
-                    { name: "🔁 Provide feedback", value: "feedback" },
-                    { name: "❌ Cancel", value: "cancel" },
+                    {name: "✅ Accept and create branch", value: "accept"},
+                    {name: "✍️ Edit manually", value: "edit"},
+                    {name: "🔁 Provide feedback", value: "feedback"},
+                    {name: "❌ Cancel", value: "cancel"},
                 ],
                 message: "What would you like to do?",
             });
@@ -173,7 +234,7 @@ export default class Index extends Command {
                     const fb = await input({
                         message: "Provide your feedback for the LLM:",
                     });
-                    messages.push({ content: fb, role: "user" });
+                    messages.push({content: fb, role: "user"});
                     break;
                 }
             }
