@@ -1,3 +1,4 @@
+import { deepmerge } from "deepmerge-ts";
 import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
@@ -9,18 +10,26 @@ export async function loadUserConfig<T>(commandId: string): Promise<T> {
     const globalConfig = await loadGlobalUserConfig<T>(commandId)
     const localConfig = await loadLocalUserConfig<T>(commandId)
 
-    return { ...globalConfig, ...localConfig };
+    return deepmerge(globalConfig, localConfig) as T;
 }
 
-export async function loadUserConfigForOutput<T extends Record<string, string>>(commandId: string): Promise<T> {
+export async function loadUserConfigForOutput<T extends Record<string, object | string>>(commandId: string): Promise<T> {
     const globalConfig = await loadGlobalUserConfig<T>(commandId);
     const localConfig = await loadLocalUserConfig<T>(commandId);
 
     const globalWithMarker = Object.fromEntries(
-        Object.entries(globalConfig).map(([key, value]) => [key, `${value} (global)`])
+        Object.entries(globalConfig).map(([key, value]) => {
+            if(typeof value === "string") {
+                return [key, `${value} (global)`]
+            }
+
+            const populatedValue = Object.fromEntries(Object.entries(value).map(([subKey, subValue]) => [subKey, `${subValue} (global)`]))
+
+            return [key, populatedValue]
+        })
     ) as T;
 
-    return { ...globalWithMarker, ...localConfig };
+    return deepmerge(globalWithMarker, localConfig) as T;
 }
 
 export async function readConfig<T>(configPath: string): Promise<T> {
