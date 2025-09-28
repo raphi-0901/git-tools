@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/commands/hello/index.ts","./src/commands/hello/world.ts"],"version":"5.9.2"}
+{"root":["./src/index.ts","./src/commands/list.ts","./src/commands/auto-branch/config.ts","./src/commands/auto-branch/index.ts","./src/commands/auto-commit/config.ts","./src/commands/auto-commit/index.ts","./src/shared/base-config-command.ts","./src/types/auto-branch-config.ts","./src/types/auto-commit-config.ts","./src/utils/create-empty-config-file.ts","./src/utils/get-repository-root-path.ts","./src/utils/user-config.ts"],"version":"5.9.2"}

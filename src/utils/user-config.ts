@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { createEmptyConfigFile } from "./create-empty-config-file.js";
-import { getRepositoryRootPath } from "./get-repository-root-path.ts";
+import { getRepositoryRootPath } from "./get-repository-root-path.js";
 
 export async function loadUserConfig<T>(commandId: string): Promise<T> {
     const globalConfig = await loadGlobalUserConfig<T>(commandId)
