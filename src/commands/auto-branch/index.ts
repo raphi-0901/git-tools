@@ -45,6 +45,10 @@ export default class Index extends Command {
         }
 
         const issue = await this.getIssue(apiKey!, email!, finalHostname, parsedIssueId);
+        if (!issue) {
+            this.error("❌ No issue found for the provided ID. Try to check the URL or the API key. If the issue is private, make sure to use the API key with the correct permissions.");
+        }
+
         const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "";
         const messages = this.buildInitialMessages(issue, instructions);
         const client = new OpenAI.OpenAI({apiKey: groqApiKey, baseURL: "https://api.groq.com/openai/v1"})
@@ -100,19 +104,43 @@ export default class Index extends Command {
         email: string,
         hostname: string,
         issueId: string
-    ): Promise<IssueSummary> {
-        const client = new Version2Client({
-            authentication: {basic: {apiToken: apiKey, email}},
-            host: `https://${hostname}`,
-        });
+    ): Promise<IssueSummary | null> {
+        let client: Version2Client;
+        let issue;
+        const host = `https://${hostname}`
 
-        const issue = await client.issues.getIssue({issueIdOrKey: issueId});
+        try {
+            client = new Version2Client({
+                authentication: {basic: {apiToken: apiKey, email}},
+                host,
+            })
+
+            issue = await client.issues.getIssue({issueIdOrKey: issueId});
+        } catch {
+            try {
+
+                client = new Version2Client({
+                    authentication: {
+                        oauth2: {
+                            accessToken: apiKey,
+                        }
+                    },
+                    host,
+                });
+
+                issue = await client.issues.getIssue({issueIdOrKey: issueId});
+            } catch {
+                return null;
+            }
+        }
+
         return {
-            description: issue.fields.description || '',
+            description: issue.fields.description || "",
             summary: issue.fields.summary,
             ticketId: issue.key,
         };
     }
+
 
     private async handleUserDecision(
         branchName: string,
