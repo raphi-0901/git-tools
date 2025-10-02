@@ -9,19 +9,19 @@ import {retrieveWIPSnapshots} from "../../utils/retrieve-wip-snapshots.js";
 export default class List extends Command {
     static args = {
         idOrRef: Args.string({
-            description: "ID or ref of the WIP snapshot to restore. If not provided, a list of all snapshots will be shown.",
+            description: "ID or ref of the WIP-snapshot to restore. If not provided, a list of all snapshots will be shown.",
             name: "idOrRef",
             required: false,
         }),
     };
-    static description = "Restore a WIP snapshot.";
+    static description = "Restore a WIP-snapshot.";
 
     async getRefName(idOrRef: string | undefined): Promise<string> {
         const wipSnapshots = retrieveWIPSnapshots()
 
         if (idOrRef === undefined) {
             return search({
-                message: 'Select a WIP Snapshot to restore:',
+                message: 'Select a WIP-Snapshot to restore:',
                 source(input) {
                     if (!input) {
                         return wipSnapshots.map((snapshot) => ({description: snapshot.message, value: snapshot.ref}));
@@ -62,9 +62,8 @@ export default class List extends Command {
 
             execSync(`git checkout ${refName} -- .`);
             this.log(`WIP-Snapshot ${refName} successfully restored.`);
-
         } catch (error) {
-            this.error(`Error while restoring WIP snapshot:${error}`)
+            this.error(`Error while restoring WIP-Snapshot: ${error}`)
         }
     }
 

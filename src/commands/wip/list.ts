@@ -20,7 +20,7 @@ export default class List extends Command {
                 }
             }
         } catch (error) {
-            this.error('Error while listing WIP snapshots:' + error)
+            this.error('Error while listing WIP-snapshots:' + error)
         }
     }
 }

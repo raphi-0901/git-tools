@@ -1,14 +1,14 @@
 import {execSync} from "node:child_process";
 
-import {WipSnapshot} from "../types/wip-snapshot.js";
+import {WIPSnapshot} from "../types/wip-snapshot.js";
 
-export function retrieveWIPSnapshots (): WipSnapshot[] {
+export function retrieveWIPSnapshots (): WIPSnapshot[] {
     try {
         // read all refs under refs/wip/**
         const refsOutput = execSync('git for-each-ref --format="%(refname) %(objectname) %(subject)" refs/wip/').toString();
 
         if (!refsOutput.trim()) {
-            console.log('No WIP snapshots found.');
+            console.log('No WIP-snapshots found.');
 
             return []
         }
@@ -26,7 +26,7 @@ export function retrieveWIPSnapshots (): WipSnapshot[] {
             };
         });
     } catch {
-        console.error("Error while retrieving WIP snapshots:")
+        console.error("Error while retrieving WIP-snapshots.")
 
         return []
     }

@@ -7,12 +7,12 @@ import {generateSnapshotName} from "../../utils/generate-snapshot-name.js";
 export default class Index extends Command {
     static args = {
         name: Args.string({
-            description: "Message for identifying the WIP snapshot. Default: WIP Snapshot",
+            description: "Message for identifying the WIP-snapshot. Default: WIP-Snapshot",
             name: "message",
             required: false,
         }),
     };
-    static description = "Creates an WIP snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating the snapshot.";
+    static description = "Creates an WIP-snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating the snapshot.";
     static flags = {
         nukeWorkingTree: Flags.string({
             char: "f",
@@ -22,7 +22,7 @@ export default class Index extends Command {
 
     async run(): Promise<void> {
         const {args, flags} = await this.parse(Index);
-        const snapshotName = args.name ?? "WIP Snapshot";
+        const snapshotName = args.name ?? "WIP-Snapshot";
 
         await this.saveWipSnapshot(snapshotName, Boolean(flags.nukeWorkingTree))
     }

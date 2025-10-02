@@ -1,4 +1,4 @@
-export type WipSnapshot = {
+export type WIPSnapshot = {
     hash: string,
     id: number,
     message: string,
