@@ -67,7 +67,9 @@ ${diff}
         while (!finished) {
             const response = await client.chat.completions.create({
                 messages,
-                model: "llama-3.3-70b-versatile",
+                // model: "llama-3.3-70b-versatile",
+                // model: "openai/gpt-oss-20b",
+                model: "openai/gpt-oss-120b",
                 temperature: 0.4,
             });
 
