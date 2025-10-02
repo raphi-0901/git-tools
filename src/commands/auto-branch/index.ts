@@ -106,26 +106,45 @@ Ticket Description: "${issue.description}"
         apiKey: string,
         email: string,
         hostname: string,
-        issueId: string
+        issueId: string,
     ): Promise<IssueSummary | null> {
         const host = `https://${hostname}`;
-        let client: Version2Client;
         let issue;
 
-        try {
-            client = new Version2Client({
-                authentication: { basic: { apiToken: apiKey, email } },
-                host,
+        type Authentication =
+            | { basic: { apiToken: string; email: string; } }
+            | { oauth2: { accessToken: string } };
+
+        const isTimeout = (error?: object) => error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT')
+
+        const fetchIssue = async (auth: Authentication) => {
+            const client = new Version2Client({
+                authentication: auth,
+                baseRequestConfig: {
+                    timeout: 5000
+                },
+                host
             });
-            issue = await client.issues.getIssue({ issueIdOrKey: issueId });
-        } catch {
+            return client.issues.getIssue({ issueIdOrKey: issueId });
+        };
+
+        try {
+            issue = await fetchIssue({ basic: { apiToken: apiKey, email } });
+        } catch (error) {
+            if (isTimeout(error!)) {
+                this.log(chalk.yellow('⚠️ Request timed out, retrying with OAuth2...'));
+            }
+
             try {
-                client = new Version2Client({
-                    authentication: { oauth2: { accessToken: apiKey } },
-                    host,
-                });
-                issue = await client.issues.getIssue({ issueIdOrKey: issueId });
-            } catch {
+                issue = await fetchIssue({ oauth2: { accessToken: apiKey } });
+            } catch (error) {
+                if (isTimeout(error!)) {
+                    this.error(chalk.red('❌ Request timed out'));
+                }
+
                 return null;
             }
         }
