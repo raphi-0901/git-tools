@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
 
+import {UserConfig} from "../types/user-config.js";
 import { createEmptyConfigFile } from "./create-empty-config-file.js";
 import { getRepositoryRootPath } from "./get-repository-root-path.js";
 

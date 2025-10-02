@@ -1,5 +1,6 @@
 import {Args, Command, Flags} from "@oclif/core";
 
+import {UserConfig} from "../types/user-config.js";
 import {
     getConfigFilePath,
     loadGlobalUserConfig, loadLocalUserConfig,
@@ -51,28 +52,46 @@ export abstract class BaseConfigCommand extends Command {
         return allowedKey.key
     }
 
+    protected logConfiguration(config: UserConfig): void {
+        for (const [key, value] of Object.entries(config)) {
+            if (typeof value === "object" && value !== null) {
+                this.log(`  ${key}:`);
+
+                for (const [subKey, subValue] of Object.entries(value)) {
+                    this.log(`    ${subKey}: ${subValue}`);
+                }
+            } else {
+                this.log(`  ${key}: ${value}`);
+            }
+        }
+    }
+
+    protected logSingleValue(key: string, value: object | string | undefined): void {
+        if (value === undefined) {
+            this.log(`ℹ️ No value set for "${key}"`);
+        } else if (typeof value === "object" && value !== null) {
+            this.log(`ℹ️ Current values for "${key}":`);
+            const keyObj = value as UserConfig;
+            for (const [host, value] of Object.entries(keyObj)) {
+                this.log(`  ${host}: ${value}`);
+            }
+        } else {
+            this.log(`ℹ️ Current value of "${key}": "${value}"`);
+        }
+    }
+
     protected async runConfigLogic(): Promise<void> {
         const {args, flags} = await this.parse(BaseConfigCommand);
         const configPath = await getConfigFilePath(this.commandId, flags.global);
 
         // Show entire config if no key provided
         if (!args.key) {
-            const configForOutput = await loadUserConfigForOutput<Record<string, string>>(this, this.commandId);
+            const configForOutput = await loadUserConfigForOutput<UserConfig>(this, this.commandId);
             if (Object.keys(configForOutput).length === 0) {
                 this.log("ℹ️ Configuration is empty.");
             } else {
                 this.log("ℹ️ Current configuration:");
-                for (const [key, value] of Object.entries(configForOutput)) {
-                    if (typeof value === "object" && value !== null) {
-                        this.log(`  ${key}:`);
-
-                        for (const [subKey, subValue] of Object.entries(value)) {
-                            this.log(`    ${subKey}: ${subValue}`);
-                        }
-                    } else {
-                        this.log(`  ${key}: ${value}`);
-                    }
-                }
+                this.logConfiguration(configForOutput);
             }
 
             return;
@@ -83,26 +102,16 @@ export abstract class BaseConfigCommand extends Command {
 
         // show one specific key if value is not provided
         if (args.value === undefined) {
-            const config = await loadUserConfig<Record<string, object | string>>(this, this.commandId);
+            const config = await loadUserConfig<UserConfig>(this, this.commandId);
             const currentValue = config[keyFromAllowedKey];
-            if (currentValue === undefined) {
-                this.log(`ℹ️ No value set for "${validatedKey}"`);
-            } else if (typeof currentValue === "object" && currentValue !== null) {
-                this.log(`ℹ️ Current values for "${validatedKey}":`);
-                const keyObj = currentValue as Record<string, string>;
-                for (const [host, value] of Object.entries(keyObj)) {
-                    this.log(`  ${host}: ${value}`);
-                }
-            } else {
-                this.log(`ℹ️ Current value of "${validatedKey}": "${currentValue}"`);
-            }
+            this.logSingleValue(keyFromAllowedKey, currentValue)
 
             return;
         }
 
         const config = flags.global
-            ? await loadGlobalUserConfig<Record<string, object | string>>(this, this.commandId)
-            : await loadLocalUserConfig<Record<string, object | string>>(this, this.commandId);
+            ? await loadGlobalUserConfig<UserConfig>(this, this.commandId)
+            : await loadLocalUserConfig<UserConfig>(this, this.commandId);
 
         if (args.value.includes("=") && typeof validatedKey === "object" && validatedKey.isObject) {
             // Host-specific value
@@ -118,7 +127,7 @@ export abstract class BaseConfigCommand extends Command {
                 config[keyFromAllowedKey] = {};
             }
 
-            const keyObj = config[keyFromAllowedKey] as Record<string, string>;
+            const keyObj = config[keyFromAllowedKey] as UserConfig;
 
             if (hostValue === "") {
                 delete keyObj[host];
