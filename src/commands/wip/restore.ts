@@ -17,7 +17,7 @@ export default class List extends Command {
     static description = "Restore a WIP-snapshot.";
 
     async getRefName(idOrRef: string | undefined): Promise<string> {
-        const wipSnapshots = retrieveWIPSnapshots(this)
+        const wipSnapshots = retrieveWIPSnapshots()
 
         if (idOrRef === undefined) {
             return search({

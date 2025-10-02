@@ -9,7 +9,7 @@ export default class List extends Command {
 
     async run(): Promise<void> {
         try {
-            const wipSnapshots = retrieveWIPSnapshots(this);
+            const wipSnapshots = retrieveWIPSnapshots();
 
             if (wipSnapshots.length === 0) {
                 this.log(chalk.yellow("⚠️  No WIP-Snapshots found."));
