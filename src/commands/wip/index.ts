@@ -1,8 +1,9 @@
-import {Args, Command, Flags} from "@oclif/core";
-import {execSync} from 'node:child_process';
-import {ResetMode, simpleGit} from "simple-git";
+import { Args, Command, Flags } from "@oclif/core";
+import chalk from "chalk";
+import { execSync } from 'node:child_process';
+import { ResetMode, simpleGit } from "simple-git";
 
-import {generateSnapshotName} from "../../utils/generate-snapshot-name.js";
+import { generateSnapshotName } from "../../utils/generate-snapshot-name.js";
 
 export default class Index extends Command {
     static args = {
@@ -22,7 +23,7 @@ export default class Index extends Command {
     };
 
     async run(): Promise<void> {
-        const {args, flags} = await this.parse(Index);
+        const { args, flags } = await this.parse(Index);
         const snapshotName = args.name ?? "WIP-Snapshot";
 
         await this.saveWipSnapshot(snapshotName, flags.nukeWorkingTree)
@@ -40,15 +41,15 @@ export default class Index extends Command {
             const refName = generateSnapshotName(branchName);
             execSync(`git update-ref ${refName} ${commitHash}`);
 
-            this.log(`WIP-Snapshot saved: ${refName} -> ${commitHash}`);
+            this.log(chalk.green(`✅ WIP-Snapshot saved: ${chalk.cyan(refName)} -> ${chalk.magenta(commitHash)}`));
 
             if (nukeWorkingTree) {
                 await git.reset(ResetMode.HARD);
                 await git.clean('f', ['-d']);
+                this.log(chalk.yellow("⚠️ Working tree nuked after creating the snapshot."));
             }
         } catch (error) {
-            this.error(`Error while creating WIP-Snapshot: ${error}`);
+            this.error(chalk.red(`❌ Error while creating WIP-Snapshot: ${error}`));
         }
     }
 }
-

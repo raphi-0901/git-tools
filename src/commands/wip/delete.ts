@@ -7,7 +7,7 @@ import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 
 export default class Delete extends Command {
     static description = "Delete one or more WIP-Snapshots interactively.";
-static examples = [
+    static examples = [
         "$ mycli delete",
         "$ mycli delete --all",
     ];
