@@ -26,7 +26,9 @@ export default class List extends Command {
                         return wipSnapshots.map((snapshot) => ({description: snapshot.message, value: snapshot.ref}));
                     }
 
-                    const data = wipSnapshots.filter((snapshot) => snapshot.id.toString().includes(input) || snapshot.ref.includes(input));
+                    const data = wipSnapshots.filter((snapshot) => snapshot.id.toString().includes(input)
+                        || snapshot.ref.toLowerCase().includes(input.toLowerCase())
+                        || snapshot.message.toLowerCase().includes(input.toLowerCase()));
 
                     return data.map((snapshot) => ({description: snapshot.message, value: snapshot.ref}));
                 },
