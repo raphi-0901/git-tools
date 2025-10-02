@@ -1,10 +1,44 @@
-import { checkbox } from "@inquirer/prompts";
-import { Command } from "@oclif/core";
+import { search } from "@inquirer/prompts";
+import {Args, Command} from "@oclif/core";
 import {execSync} from "node:child_process";
 import { simpleGit } from "simple-git";
 
+import {retrieveWIPSnapshots} from "../../utils/retrieve-wip-snapshots.js";
+
 export default class List extends Command {
-    static description = "Liste alle Git-Branches und wähle interaktiv aus";
+    static args = {
+        idOrRef: Args.string({
+            description: "ID or ref of the WIP snapshot to restore. If not provided, a list of all snapshots will be shown.",
+            name: "idOrRef",
+            required: false,
+        }),
+    };
+    static description = "Restore a WIP snapshot.";
+
+    async getRefName(idOrRef: string | undefined): Promise<string> {
+        const wipSnapshots = retrieveWIPSnapshots()
+
+        if(idOrRef === undefined) {
+            return search({
+                message: 'Select a WIP Snapshot to restore:',
+                source(input) {
+                    if (!input) {
+                        return wipSnapshots.map((snapshot) => ({description: snapshot.message, value: snapshot.ref}));
+                    }
+
+                    const data = wipSnapshots.filter((snapshot) => snapshot.id.toString().includes(input) || snapshot.ref.includes(input));
+
+                    return data.map((snapshot) => ({description: snapshot.message, value: snapshot.ref}));
+                },
+            });
+        }
+
+        if(Number.isNaN(Number(idOrRef))) {
+            return wipSnapshots.find((snapshot) => snapshot.ref === idOrRef)?.ref ?? idOrRef
+        }
+
+        return wipSnapshots.find((snapshot) => snapshot.id === Number(idOrRef))?.ref ?? idOrRef
+    }
 
     async restoreWipSnapshot(refName: string, options: {
         autoBackup?: boolean;
@@ -41,22 +75,13 @@ export default class List extends Command {
     }
 
     async run(): Promise<void> {
-        await this.restoreWipSnapshot('refs/wip/main/2024-01-01T12:00:00Z')
+        const {args} = await this.parse(List);
+        const ref = await this.getRefName(args.idOrRef)
 
-        const git = simpleGit();
-        const branches = await git.branchLocal();
-        const branchNames = branches.all;
+        console.log('ref :>>', ref);
 
-        if (branchNames.length === 0) {
-            this.log("❌ Keine Branches gefunden.");
-            return;
-        }
-
-        const selectedBranches = await checkbox({
-            choices: branchNames,
-            message: 'Select a package manager',
-        });
-
-        this.log("✅ Ausgewählt:", selectedBranches.join(", "));
+        // show list if no argument is passed
+        // if argument is number -> check for id, otherwise check for name
+        await this.restoreWipSnapshot(ref)
     }
 }
