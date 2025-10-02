@@ -35,7 +35,7 @@ export default class List extends Command {
                 table.push([
                     chalk.blueBright(snapshot.id.toString()),
                     chalk.green(snapshot.ref),
-                    chalk.magenta(snapshot.hash),
+                    chalk.magenta(snapshot.hash.slice(0,7)),
                     snapshot.message,
                 ]);
             }
