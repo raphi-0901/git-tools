@@ -1,9 +1,10 @@
 import { input, select } from "@inquirer/prompts";
 import { Command, Flags } from "@oclif/core";
+import chalk from "chalk";
 import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
-import {AutoCommitConfig} from "../../types/auto-commit-config.js";
+import { AutoCommitConfig } from "../../types/auto-commit-config.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
 export default class Index extends Command {
@@ -22,20 +23,19 @@ export default class Index extends Command {
         const diff = await git.diff(["--cached"]);
 
         if (diff.trim().length === 0) {
-            this.warn("❌ No staged files to create a commit message");
+            this.log(chalk.red("❌ No staged files to create a commit message"));
             return;
         }
 
         const userConfig = await loadUserConfig<Partial<AutoCommitConfig>>(this, "auto-commit");
-        if(!userConfig.GROQ_API_KEY) {
-            this.warn("No API key found for running this command");
+        if (!userConfig.GROQ_API_KEY) {
+            this.log(chalk.yellow("⚠️ No API key found for running this command"));
             return;
         }
 
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
 
-        // Use the -i/--instruction flag if provided, otherwise fallback to user config
         const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "Keep it short and conventional";
         const client = new OpenAI.OpenAI({
             apiKey: userConfig.GROQ_API_KEY,
@@ -50,11 +50,11 @@ export default class Index extends Command {
             },
             {
                 content: `
-                    Create a commit message using the following instructions and information.
-                    User Instructions: "${instructions}"
-                    Current Branch: "${currentBranch}"
-                    Diffs of Staged Files:
-                    ${diff}
+Create a commit message using the following instructions and information.
+User Instructions: "${instructions}"
+Current Branch: "${currentBranch}"
+Diffs of Staged Files:
+${diff}
                 `,
                 role: "user",
             },
@@ -73,12 +73,12 @@ export default class Index extends Command {
 
             commitMessage = response.choices[0]?.message?.content?.trim() ?? "";
             if (!commitMessage) {
-                this.error("❌ No commit message received from Groq API");
+                this.error(chalk.red("❌ No commit message received from Groq API"));
                 return;
             }
 
-            this.log("\n🤖 Suggested commit message:");
-            this.log(`   ${commitMessage}\n`);
+            this.log(chalk.blue("\n🤖 Suggested commit message:"));
+            this.log(`   ${chalk.green(commitMessage)}\n`);
 
             const decision = await select({
                 choices: [
@@ -93,13 +93,13 @@ export default class Index extends Command {
             switch (decision) {
                 case "accept": {
                     await git.commit(commitMessage);
-                    this.log("✅ Commit executed!");
+                    this.log(chalk.green("✅ Commit executed!"));
                     finished = true;
                     break;
                 }
 
                 case "cancel": {
-                    this.log("🚫 Commit cancelled.");
+                    this.log(chalk.red("🚫 Commit cancelled."));
                     finished = true;
                     break;
                 }
@@ -110,16 +110,16 @@ export default class Index extends Command {
                         message: "Enter your custom commit message:",
                     });
                     await git.commit(userEdit);
-                    this.log("✅ Commit executed with custom message!");
+                    this.log(chalk.green("✅ Commit executed with custom message!"));
                     finished = true;
                     break;
                 }
 
                 case "feedback": {
-                    const fb = await input({
+                    const feedback = await input({
                         message: "Provide your feedback for the LLM:",
                     });
-                    messages.push({ content: fb, role: "user" });
+                    messages.push({ content: feedback, role: "user" });
                     break;
                 }
             }

@@ -1,9 +1,11 @@
-import {Args, Command, Flags} from "@oclif/core";
+import { Args, Command, Flags } from "@oclif/core";
+import chalk from "chalk";
 
-import {UserConfig} from "../types/user-config.js";
+import { UserConfig } from "../types/user-config.js";
 import {
     getConfigFilePath,
-    loadGlobalUserConfig, loadLocalUserConfig,
+    loadGlobalUserConfig,
+    loadLocalUserConfig,
     loadUserConfig,
     loadUserConfigForOutput,
     saveUserConfig
@@ -33,7 +35,7 @@ export abstract class BaseConfigCommand extends Command {
         }),
     };
     static flags = {
-        global: Flags.boolean({description: "Set configuration globally"}),
+        global: Flags.boolean({ description: "Set configuration globally" }),
     };
     protected allowedKeys: AllowedKey[];
     protected commandId: string;
@@ -45,52 +47,47 @@ export abstract class BaseConfigCommand extends Command {
     }
 
     protected getKeyFromAllowedKey(allowedKey: AllowedKey) {
-        if(typeof allowedKey === "string") {
-            return  allowedKey
-        }
-
-        return allowedKey.key
+        if (typeof allowedKey === "string") return allowedKey;
+        return allowedKey.key;
     }
 
     protected logConfiguration(config: UserConfig): void {
         for (const [key, value] of Object.entries(config)) {
             if (typeof value === "object" && value !== null) {
-                this.log(`  ${key}:`);
-
+                this.log(chalk.blue(`  ${key}:`));
                 for (const [subKey, subValue] of Object.entries(value)) {
-                    this.log(`    ${subKey}: ${subValue}`);
+                    this.log(`    ${chalk.yellow(subKey)}: ${chalk.green(subValue)}`);
                 }
             } else {
-                this.log(`  ${key}: ${value}`);
+                this.log(`  ${chalk.yellow(key)}: ${chalk.green(value)}`);
             }
         }
     }
 
     protected logSingleValue(key: string, value: object | string | undefined): void {
         if (value === undefined) {
-            this.log(`ℹ️ No value set for "${key}"`);
+            this.log(chalk.blue(`ℹ️ No value set for "${key}"`));
         } else if (typeof value === "object" && value !== null) {
-            this.log(`ℹ️ Current values for "${key}":`);
+            this.log(chalk.blue(`ℹ️ Current values for "${key}":`));
             const keyObj = value as UserConfig;
-            for (const [host, value] of Object.entries(keyObj)) {
-                this.log(`  ${host}: ${value}`);
+            for (const [host, val] of Object.entries(keyObj)) {
+                this.log(`  ${chalk.yellow(host)}: ${chalk.green(val)}`);
             }
         } else {
-            this.log(`ℹ️ Current value of "${key}": "${value}"`);
+            this.log(chalk.blue(`ℹ️ Current value of "${key}": `) + chalk.green(`"${value}"`));
         }
     }
 
     protected async runConfigLogic(): Promise<void> {
-        const {args, flags} = await this.parse(BaseConfigCommand);
+        const { args, flags } = await this.parse(BaseConfigCommand);
         const configPath = await getConfigFilePath(this.commandId, flags.global);
 
-        // Show entire config if no key provided
         if (!args.key) {
             const configForOutput = await loadUserConfigForOutput<UserConfig>(this, this.commandId);
             if (Object.keys(configForOutput).length === 0) {
-                this.log("ℹ️ Configuration is empty.");
+                this.log(chalk.blue("ℹ️ Configuration is empty."));
             } else {
-                this.log("ℹ️ Current configuration:");
+                this.log(chalk.blue("ℹ️ Current configuration:"));
                 this.logConfiguration(configForOutput);
             }
 
@@ -98,14 +95,12 @@ export abstract class BaseConfigCommand extends Command {
         }
 
         const validatedKey = this.validateKey(args.key);
-        const keyFromAllowedKey = this.getKeyFromAllowedKey(validatedKey)
+        const keyFromAllowedKey = this.getKeyFromAllowedKey(validatedKey);
 
-        // show one specific key if value is not provided
         if (args.value === undefined) {
             const config = await loadUserConfig<UserConfig>(this, this.commandId);
             const currentValue = config[keyFromAllowedKey];
-            this.logSingleValue(keyFromAllowedKey, currentValue)
-
+            this.logSingleValue(keyFromAllowedKey, currentValue);
             return;
         }
 
@@ -114,13 +109,12 @@ export abstract class BaseConfigCommand extends Command {
             : await loadLocalUserConfig<UserConfig>(this, this.commandId);
 
         if (args.value.includes("=") && typeof validatedKey === "object" && validatedKey.isObject) {
-            // Host-specific value
             const index = args.value.indexOf("=");
             const host = args.value.slice(0, index);
             const hostValue = args.value.slice(index + 1);
 
             if (!host) {
-                this.error(`❌ Invalid format. Use "hostname=value" for host-specific keys.`);
+                this.error(chalk.red(`❌ Invalid format. Use "hostname=value" for host-specific keys.`));
             }
 
             if (!config[keyFromAllowedKey] || typeof config[keyFromAllowedKey] !== "object") {
@@ -131,24 +125,21 @@ export abstract class BaseConfigCommand extends Command {
 
             if (hostValue === "") {
                 delete keyObj[host];
-                this.log(`✅ Removed host "${host}" from "${validatedKey}"`);
+                this.log(chalk.green(`✅ Removed host "${host}" from "${validatedKey}"`));
             } else {
                 keyObj[host] = hostValue;
-                this.log(`✅ Set "${validatedKey}" for host "${host}" to "${hostValue}"`);
+                this.log(chalk.green(`✅ Set "${validatedKey}" for host "${host}" to "${hostValue}"`));
             }
-        } else {
-            // Simple key-value
-            if (args.value === "") {
+        } else if (args.value === "") {
                 delete config[keyFromAllowedKey];
-                this.log(`✅ Removed "${validatedKey}"`);
+                this.log(chalk.green(`✅ Removed "${validatedKey}"`));
             } else {
                 config[keyFromAllowedKey] = args.value;
-                this.log(`✅ Set "${validatedKey}" to "${args.value}"`);
+                this.log(chalk.green(`✅ Set "${validatedKey}" to "${args.value}"`));
             }
-        }
 
         await saveUserConfig(this.commandId, config, flags.global);
-        this.log(`📂 Configuration saved at ${configPath}`);
+        this.log(chalk.cyan(`📂 Configuration saved at ${configPath}`));
     }
 
     protected validateKey(key: string) {
@@ -159,7 +150,7 @@ export abstract class BaseConfigCommand extends Command {
         });
 
         if (!foundKey) {
-            this.error(`❌ Invalid key "${key}". Allowed keys: ${this.allowedKeys.map(allowedKey => this.getKeyFromAllowedKey(allowedKey)).join(", ")}`);
+            this.error(chalk.red(`❌ Invalid key "${key}". Allowed keys: ${this.allowedKeys.map(allowedKey => this.getKeyFromAllowedKey(allowedKey)).join(", ")}`));
         }
 
         return foundKey;
