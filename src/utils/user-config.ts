@@ -48,11 +48,17 @@ export async function readConfig<T>(configPath: string): Promise<T> {
     return {} as T;
 }
 
-export async function getConfigFilePath(commandId: string, global =  false) {
-    if(global) {
-        return path.join(os.homedir(), `/.config/${commandId}/config.json`);
+export async function getConfigFilePath(commandId: string, global = false) {
+    if (global) {
+        const isWin = process.platform === "win32";
+        const baseDir = isWin
+            ? process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
+            : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+
+        return path.join(baseDir, commandId, "config.json");
     }
 
+    // local config is repo-specific, so it is the same for all platforms
     const repositoryRootPath = await getRepositoryRootPath();
     return path.join(repositoryRootPath, `.git/${commandId}.config.json`);
 }
