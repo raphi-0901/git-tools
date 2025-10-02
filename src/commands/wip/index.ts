@@ -2,6 +2,8 @@ import {Args, Command, Flags} from "@oclif/core";
 import {execSync} from 'node:child_process';
 import {ResetMode, simpleGit} from "simple-git";
 
+import {generateSnapshotName} from "../../utils/generate-snapshot-name.js";
+
 export default class Index extends Command {
     static args = {
         name: Args.string({
@@ -17,15 +19,6 @@ export default class Index extends Command {
             description: "Nukes the working tree after creating the snapshot.",
         }),
     };
-
-    getNowAsString(): string {
-        const now = new Date();
-        return `${now.getFullYear()}-${this.pad(now.getMonth() + 1)}-${this.pad(now.getDate())}_${this.pad(now.getHours())}-${this.pad(now.getMinutes())}-${this.pad(now.getSeconds())}`;
-    }
-
-    pad(n: number) {
-        return n.toString().padStart(2, '0');
-    }
 
     async run(): Promise<void> {
         const {args, flags} = await this.parse(Index);
@@ -43,17 +36,17 @@ export default class Index extends Command {
             const commitHash = execSync(`echo "${snapshotName}" | git commit-tree ${treeHash} -p HEAD`).toString().trim();
 
             const branchName = (await git.branchLocal()).current;
-            const refName = `refs/wip/${branchName}/${this.getNowAsString()}`;
+            const refName = generateSnapshotName(branchName);
             execSync(`git update-ref ${refName} ${commitHash}`);
 
-            console.log(`WIP Snapshot gespeichert: ${refName} -> ${commitHash}`);
+            this.log(`WIP-Snapshot saved: ${refName} -> ${commitHash}`);
 
             if (nukeWorkingTree) {
                 await git.reset(ResetMode.HARD);
                 await git.clean('f', ['-d']);
             }
         } catch (error) {
-            console.error('Fehler beim WIP-Snapshot:', error);
+            this.error(`Error while creating WIP-Snapshot: ${error}`);
         }
     }
 }
