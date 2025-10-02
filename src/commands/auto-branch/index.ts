@@ -35,7 +35,7 @@ export default class Index extends Command {
 
     async run() {
         const {args, flags} = await this.parse(Index);
-        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>("auto-branch", this);
+        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, "auto-branch");
         const {apiKey, email, groqApiKey} = this.validateRequiredConfig(args.issueId, userConfig);
 
         const {hostname, issueId: parsedIssueId} = this.parseUrl(args.issueId);

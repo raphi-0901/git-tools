@@ -57,7 +57,7 @@ export abstract class BaseConfigCommand extends Command {
 
         // Show entire config if no key provided
         if (!args.key) {
-            const configForOutput = await loadUserConfigForOutput<Record<string, string>>(this.commandId, this);
+            const configForOutput = await loadUserConfigForOutput<Record<string, string>>(this, this.commandId);
             if (Object.keys(configForOutput).length === 0) {
                 this.log("ℹ️ Configuration is empty.");
             } else {
@@ -83,7 +83,7 @@ export abstract class BaseConfigCommand extends Command {
 
         // show one specific key if value is not provided
         if (args.value === undefined) {
-            const config = await loadUserConfig<Record<string, object | string>>(this.commandId, this);
+            const config = await loadUserConfig<Record<string, object | string>>(this, this.commandId);
             const currentValue = config[keyFromAllowedKey];
             if (currentValue === undefined) {
                 this.log(`ℹ️ No value set for "${validatedKey}"`);
@@ -101,8 +101,8 @@ export abstract class BaseConfigCommand extends Command {
         }
 
         const config = flags.global
-            ? await loadGlobalUserConfig<Record<string, object | string>>(this.commandId, this)
-            : await loadLocalUserConfig<Record<string, object | string>>(this.commandId, this);
+            ? await loadGlobalUserConfig<Record<string, object | string>>(this, this.commandId)
+            : await loadLocalUserConfig<Record<string, object | string>>(this, this.commandId);
 
         if (args.value.includes("=") && typeof validatedKey === "object" && validatedKey.isObject) {
             // Host-specific value

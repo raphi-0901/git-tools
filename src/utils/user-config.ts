@@ -7,16 +7,16 @@ import path from "node:path";
 import { createEmptyConfigFile } from "./create-empty-config-file.js";
 import { getRepositoryRootPath } from "./get-repository-root-path.js";
 
-export async function loadUserConfig<T>(commandId: string, ctx: Command): Promise<T> {
-    const globalConfig = await loadGlobalUserConfig<T>(commandId, ctx)
-    const localConfig = await loadLocalUserConfig<T>(commandId, ctx)
+export async function loadUserConfig<T>(ctx: Command, commandId: string): Promise<T> {
+    const globalConfig = await loadGlobalUserConfig<T>(ctx, commandId)
+    const localConfig = await loadLocalUserConfig<T>(ctx, commandId)
 
     return deepmerge(globalConfig, localConfig) as T;
 }
 
-export async function loadUserConfigForOutput<T extends Record<string, object | string>>(commandId: string, ctx: Command): Promise<T> {
-    const globalConfig = await loadGlobalUserConfig<T>(commandId, ctx);
-    const localConfig = await loadLocalUserConfig<T>(commandId, ctx);
+export async function loadUserConfigForOutput<T extends UserConfig>(ctx: Command, commandId: string): Promise<T> {
+    const globalConfig = await loadGlobalUserConfig<T>(ctx, commandId);
+    const localConfig = await loadLocalUserConfig<T>(ctx, commandId);
 
     const globalWithMarker = Object.fromEntries(
         Object.entries(globalConfig).map(([key, value]) => {
@@ -33,7 +33,7 @@ export async function loadUserConfigForOutput<T extends Record<string, object | 
     return deepmerge(globalWithMarker, localConfig) as T;
 }
 
-export async function readConfig<T>(configPath: string, ctx: Command): Promise<T> {
+export async function readConfig<T>(ctx: Command, configPath: string): Promise<T> {
     if (await fs.pathExists(configPath)) {
         try {
             return await fs.readJSON(configPath) as T;
@@ -64,12 +64,12 @@ export async function getConfigFilePath(commandId: string, global = false) {
     return path.join(repositoryRootPath, `.git/${commandId}.config.json`);
 }
 
-export async function loadGlobalUserConfig<T>(commandId: string, ctx: Command): Promise<T> {
-    return readConfig<T>(await getConfigFilePath(commandId, true), ctx);
+export async function loadGlobalUserConfig<T>(ctx: Command, commandId: string): Promise<T> {
+    return readConfig<T>(ctx, await getConfigFilePath(commandId, true));
 }
 
-export async function loadLocalUserConfig<T>(commandId: string, ctx: Command): Promise<T> {
-    return readConfig<T>(await getConfigFilePath(commandId), ctx);
+export async function loadLocalUserConfig<T>(ctx: Command, commandId: string): Promise<T> {
+    return readConfig<T>(ctx, await getConfigFilePath(commandId));
 }
 
 export async function saveUserConfig<T>(commandId: string, config: Partial<T>, global = false) {
