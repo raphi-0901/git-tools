@@ -35,7 +35,7 @@ export default class Index extends Command {
 
     async run() {
         const {args, flags} = await this.parse(Index);
-        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>("auto-branch");
+        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>("auto-branch", this);
         const {apiKey, email, groqApiKey} = this.validateRequiredConfig(args.issueId, userConfig);
 
         const {hostname, issueId: parsedIssueId} = this.parseUrl(args.issueId);
@@ -147,8 +147,8 @@ export default class Index extends Command {
         messages: OpenAI.OpenAI.Chat.ChatCompletionMessageParam[],
     ) {
         const git = simpleGit();
-        console.log("\n🤖 Suggested branch message:");
-        console.log(`   ${branchName}\n`);
+        this.log("\n🤖 Suggested branch message:");
+        this.log(`   ${branchName}\n`);
 
         const decision = await select({
             choices: [
@@ -163,19 +163,19 @@ export default class Index extends Command {
         switch (decision) {
             case "accept": {
                 await git.checkoutLocalBranch(branchName);
-                console.log("✅ Branch created!");
+                this.log("✅ Branch created!");
                 return true;
             }
 
             case "cancel": {
-                console.log("🚫 Branch creation cancelled.");
+                this.log("🚫 Branch creation cancelled.");
                 return true;
             }
 
             case "edit": {
                 const userEdit = await input({default: branchName, message: "Enter your custom branch name:"});
                 await git.checkoutLocalBranch(userEdit);
-                console.log("✅ Branch created with custom name!");
+                this.log("✅ Branch created with custom name!");
                 return true;
             }
 

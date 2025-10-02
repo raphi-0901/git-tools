@@ -1,14 +1,15 @@
+import {Command} from "@oclif/core";
 import {execSync} from "node:child_process";
 
 import {WIPSnapshot} from "../types/wip-snapshot.js";
 
-export function retrieveWIPSnapshots (): WIPSnapshot[] {
+export function retrieveWIPSnapshots(ctx: Command): WIPSnapshot[] {
     try {
         // read all refs under refs/wip/**
         const refsOutput = execSync('git for-each-ref --format="%(refname) %(objectname) %(subject)" refs/wip/').toString();
 
         if (!refsOutput.trim()) {
-            console.log('No WIP-snapshots found.');
+            ctx.log('No WIP-snapshots found.');
 
             return []
         }
@@ -26,8 +27,6 @@ export function retrieveWIPSnapshots (): WIPSnapshot[] {
             };
         });
     } catch {
-        console.error("Error while retrieving WIP-snapshots.")
-
-        return []
+        ctx.error("Error while retrieving WIP-snapshots.")
     }
 }

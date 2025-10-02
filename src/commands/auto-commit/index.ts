@@ -26,7 +26,7 @@ export default class Index extends Command {
             return;
         }
 
-        const userConfig = await loadUserConfig<Partial<AutoCommitConfig>>("auto-commit");
+        const userConfig = await loadUserConfig<Partial<AutoCommitConfig>>("auto-commit", this);
         if(!userConfig.GROQ_API_KEY) {
             this.warn("No API key found for running this command");
             return;
