@@ -14,8 +14,9 @@ export default class Index extends Command {
     };
     static description = "Creates an WIP-snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating the snapshot.";
     static flags = {
-        nukeWorkingTree: Flags.string({
+        nukeWorkingTree: Flags.boolean({
             char: "f",
+            default: false,
             description: "Nukes the working tree after creating the snapshot.",
         }),
     };
@@ -24,7 +25,7 @@ export default class Index extends Command {
         const {args, flags} = await this.parse(Index);
         const snapshotName = args.name ?? "WIP-Snapshot";
 
-        await this.saveWipSnapshot(snapshotName, Boolean(flags.nukeWorkingTree))
+        await this.saveWipSnapshot(snapshotName, flags.nukeWorkingTree)
     }
 
     async saveWipSnapshot(snapshotName: string, nukeWorkingTree: boolean) {
