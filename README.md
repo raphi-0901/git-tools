@@ -20,7 +20,7 @@ $ npm install -g @rwirnsberger/git-tools
 $ git-tools COMMAND
 running command...
 $ git-tools (--version)
-@rwirnsberger/git-tools/1.0.0 linux-x64 node-v22.14.0
+@rwirnsberger/git-tools/1.0.1 linux-x64 node-v22.14.0
 $ git-tools --help [COMMAND]
 USAGE
   $ git-tools COMMAND
@@ -56,7 +56,7 @@ DESCRIPTION
   Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
 ```
 
-_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-branch/index.ts)_
+_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/auto-branch/index.ts)_
 
 ## `git-tools auto-branch config [KEY] [VALUE]`
 
@@ -72,7 +72,7 @@ FLAGS
   --global  Set configuration globally
 ```
 
-_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-branch/config.ts)_
+_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/auto-branch/config.ts)_
 
 ## `git-tools auto-commit`
 
@@ -89,7 +89,7 @@ DESCRIPTION
   Automatically generate commit messages from staged files with feedback loop
 ```
 
-_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-commit/index.ts)_
+_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/auto-commit/index.ts)_
 
 ## `git-tools auto-commit config [KEY] [VALUE]`
 
@@ -105,7 +105,7 @@ FLAGS
   --global  Set configuration globally
 ```
 
-_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-commit/config.ts)_
+_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/auto-commit/config.ts)_
 
 ## `git-tools wip [NAME]`
 
@@ -126,7 +126,7 @@ DESCRIPTION
   the snapshot.
 ```
 
-_See code: [src/commands/wip/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/index.ts)_
+_See code: [src/commands/wip/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/wip/index.ts)_
 
 ## `git-tools wip delete`
 
@@ -148,7 +148,7 @@ EXAMPLES
   $ mycli delete --all
 ```
 
-_See code: [src/commands/wip/delete.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/delete.ts)_
+_See code: [src/commands/wip/delete.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/wip/delete.ts)_
 
 ## `git-tools wip list`
 
@@ -162,7 +162,7 @@ DESCRIPTION
   List all available WIP-Snapshots.
 ```
 
-_See code: [src/commands/wip/list.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/list.ts)_
+_See code: [src/commands/wip/list.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/wip/list.ts)_
 
 ## `git-tools wip restore [IDORREF]`
 
@@ -179,5 +179,5 @@ DESCRIPTION
   Restore a WIP-snapshot.
 ```
 
-_See code: [src/commands/wip/restore.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/restore.ts)_
+_See code: [src/commands/wip/restore.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.1/src/commands/wip/restore.ts)_
 <!-- commandsstop -->
