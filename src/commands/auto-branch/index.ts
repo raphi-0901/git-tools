@@ -4,6 +4,8 @@ import chalk from "chalk";
 import { Version2Client } from "jira.js";
 import { simpleGit } from "simple-git";
 
+import {getService} from "../../services/index.js";
+import {ISSUE_SERVICE_TYPES} from "../../services/issue-service.js";
 import { AutoBranchConfig } from "../../types/auto-branch-config.js";
 import { IssueSummary } from "../../types/issue-summary.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
@@ -40,7 +42,22 @@ static flags = {
             this.error(chalk.red("❌ No DEFAULT_HOSTNAME set and issue does not contain full URL"));
         }
 
-        const issue = await this.getIssue(apiKey!, email!, finalHostname, parsedIssueId);
+        let issue: IssueSummary | null = null;
+        let usedService: null | string = null;
+
+        for (const svc of ISSUE_SERVICE_TYPES) {
+            try {
+                issue = await getService(svc, {
+                    token: "",
+                    type: svc,
+                }).getIssue(args.issueId);
+                if (issue) {
+                    usedService = svc;
+                    break;
+                }
+            } catch {}
+        }
+
         if (!issue) {
             this.error(chalk.red(
                 "❌ No issue found for the provided ID. Check the URL or API key. " +
@@ -84,58 +101,6 @@ Ticket Description: "${issue.description}"
                 role: "user",
             },
         ];
-    }
-
-    private async getIssue(
-        apiKey: string,
-        email: string,
-        hostname: string,
-        issueId: string,
-    ): Promise<IssueSummary | null> {
-        const host = `https://${hostname}`;
-        let issue;
-
-        type Authentication =
-            | { basic: { apiToken: string; email: string; } }
-            | { oauth2: { accessToken: string } };
-
-        const isTimeout = (error?: object) => error &&
-            typeof error === 'object' &&
-            'code' in error &&
-            (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT');
-
-        const fetchIssue = async (auth: Authentication) => {
-            const client = new Version2Client({
-                authentication: auth,
-                baseRequestConfig: { timeout: 5000 },
-                host
-            });
-            return client.issues.getIssue({ issueIdOrKey: issueId });
-        };
-
-        try {
-            issue = await fetchIssue({ basic: { apiToken: apiKey, email } });
-        } catch (error) {
-            if (isTimeout(error!)) {
-                this.log(chalk.yellow('⚠️ Request timed out, retrying with OAuth2...'));
-            }
-
-            try {
-                issue = await fetchIssue({ oauth2: { accessToken: apiKey } });
-            } catch (error) {
-                if (isTimeout(error!)) {
-                    this.error(chalk.red('❌ Request timed out'));
-                }
-
-                return null;
-            }
-        }
-
-        return {
-            description: issue.fields.description || "",
-            summary: issue.fields.summary,
-            ticketId: issue.key,
-        };
     }
 
     private async handleUserDecision(branchName: string, chat: LLMChat) {
