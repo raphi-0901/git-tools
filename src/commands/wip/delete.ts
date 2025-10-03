@@ -8,8 +8,18 @@ import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 export default class Delete extends Command {
     static description = "Delete one or more WIP-Snapshots interactively.";
     static examples = [
-        "$ mycli delete",
-        "$ mycli delete --all",
+        // Simple help
+        '<%= config.bin %> <%= command.id %> --help',
+        // Interactive deletion
+        {
+            command: '<%= config.bin %> <%= command.id %>',
+            description: "Select snapshots interactively to delete",
+        },
+        // Delete all snapshots with confirmation
+        {
+            command: '<%= config.bin %> <%= command.id %> --all',
+            description: "Delete all WIP-Snapshots with confirmation",
+        },
     ];
     static flags = {
         all: Flags.boolean({

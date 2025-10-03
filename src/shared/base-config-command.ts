@@ -14,7 +14,7 @@ import {
 type AllowedKey = string | {
     isObject: boolean,
     key: string,
-}
+};
 
 export interface BaseConfigOptions {
     allowedKeys: AllowedKey[];
@@ -29,14 +29,15 @@ export abstract class BaseConfigCommand extends Command {
             required: false,
         }),
         value: Args.string({
-            description: 'Value for the configuration key (leave empty to get current value). For host-specific values: host=value',
+            description: 'Value for the configuration key (leave empty to get current value). For host-specific keys: host=value',
             name: "value",
             required: false,
         }),
     };
+    protected static example = []
     static flags = {
-        global: Flags.boolean({ description: "Set configuration globally" }),
-    };
+            global: Flags.boolean({ description: "Set configuration globally" }),
+        };
     protected allowedKeys: AllowedKey[];
     protected commandId: string;
 
@@ -47,8 +48,11 @@ export abstract class BaseConfigCommand extends Command {
     }
 
     protected getKeyFromAllowedKey(allowedKey: AllowedKey) {
-        if (typeof allowedKey === "string") return allowedKey;
-        return allowedKey.key;
+        return typeof allowedKey === "string" ? allowedKey : allowedKey.key;
+    }
+
+    protected isHostSpecific(allowedKey: AllowedKey) {
+        return typeof allowedKey !== "string" && allowedKey.isObject;
     }
 
     protected logConfiguration(config: UserConfig): void {
@@ -64,24 +68,37 @@ export abstract class BaseConfigCommand extends Command {
         }
     }
 
-    protected logSingleValue(key: string, value: object | string | undefined): void {
+    protected logSingleValue(key: AllowedKey, value: object | string | undefined): void {
+        const keyFromAllowedKey = this.getKeyFromAllowedKey(key);
+        const isHostSpecific = this.isHostSpecific(key);
+        const typeInfo = isHostSpecific
+            ? 'host-specific (use "hostname=value")'
+            : 'string';
+
         if (value === undefined) {
-            this.log(chalk.blue(`ℹ️ No value set for "${key}"`));
+            this.log(chalk.blue(`ℹ️ No value set for "${keyFromAllowedKey}" (${typeInfo})`));
+
+            const helpText = isHostSpecific
+            ? chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <host>=<value>`)
+            : chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <value>`)
+            this.log(helpText);
         } else if (typeof value === "object" && value !== null) {
-            this.log(chalk.blue(`ℹ️ Current values for "${key}":`));
+            this.log(chalk.blue(`ℹ️ Current values for "${keyFromAllowedKey}" (${typeInfo}):`));
             const keyObj = value as UserConfig;
             for (const [host, val] of Object.entries(keyObj)) {
                 this.log(`  ${chalk.yellow(host)}: ${chalk.green(val)}`);
             }
         } else {
-            this.log(chalk.blue(`ℹ️ Current value of "${key}": `) + chalk.green(`"${value}"`));
+            this.log(chalk.blue(`ℹ️ Current value of "${keyFromAllowedKey}" (${typeInfo}): `) + chalk.green(`"${value}"`));
         }
     }
+
 
     protected async runConfigLogic(): Promise<void> {
         const { args, flags } = await this.parse(BaseConfigCommand);
         const configPath = await getConfigFilePath(this.commandId, flags.global);
 
+        // If no key is provided, show full configuration
         if (!args.key) {
             const configForOutput = await loadUserConfigForOutput<UserConfig>(this, this.commandId);
             if (Object.keys(configForOutput).length === 0) {
@@ -91,28 +108,33 @@ export abstract class BaseConfigCommand extends Command {
                 this.logConfiguration(configForOutput);
             }
 
+            // Also show allowed keys for guidance
+            this.log(chalk.blue("\nℹ️ Allowed configuration keys:"));
+            for (const key of this.allowedKeys) {
+                const keyName = this.getKeyFromAllowedKey(key);
+                const typeInfo = this.isHostSpecific(key) ? "(host-specific)" : "(string)";
+                this.log(`  ${chalk.yellow(keyName)} ${chalk.gray(typeInfo)}`);
+            }
+
             return;
         }
 
         const validatedKey = this.validateKey(args.key);
         const keyFromAllowedKey = this.getKeyFromAllowedKey(validatedKey);
 
-        if (args.value === undefined) {
-            const config = await loadUserConfig<UserConfig>(this, this.commandId);
-            const currentValue = config[keyFromAllowedKey];
-            this.logSingleValue(keyFromAllowedKey, currentValue);
-            return;
-        }
-
         const config = flags.global
             ? await loadGlobalUserConfig<UserConfig>(this, this.commandId)
             : await loadLocalUserConfig<UserConfig>(this, this.commandId);
 
-        if (args.value.includes("=") && typeof validatedKey === "object" && validatedKey.isObject) {
-            const index = args.value.indexOf("=");
-            const host = args.value.slice(0, index);
-            const hostValue = args.value.slice(index + 1);
+        if (args.value === undefined) {
+            const currentValue = config[keyFromAllowedKey];
+            this.logSingleValue(validatedKey, currentValue);
+            return;
+        }
 
+        // Handle host-specific keys
+        if (args.value.includes("=") && this.isHostSpecific(validatedKey)) {
+            const [host, hostValue] = args.value.split(/=(.+)/);
             if (!host) {
                 this.error(chalk.red(`❌ Invalid format. Use "hostname=value" for host-specific keys.`));
             }
@@ -122,21 +144,20 @@ export abstract class BaseConfigCommand extends Command {
             }
 
             const keyObj = config[keyFromAllowedKey] as UserConfig;
-
             if (hostValue === "") {
                 delete keyObj[host];
-                this.log(chalk.green(`✅ Removed host "${host}" from "${validatedKey}"`));
+                this.log(chalk.green(`✅ Removed host "${host}" from "${keyFromAllowedKey}"`));
             } else {
                 keyObj[host] = hostValue;
-                this.log(chalk.green(`✅ Set "${validatedKey}" for host "${host}" to "${hostValue}"`));
+                this.log(chalk.green(`✅ Set "${keyFromAllowedKey}" for host "${host}" to "${hostValue}"`));
             }
         } else if (args.value === "") {
-                delete config[keyFromAllowedKey];
-                this.log(chalk.green(`✅ Removed "${validatedKey}"`));
-            } else {
-                config[keyFromAllowedKey] = args.value;
-                this.log(chalk.green(`✅ Set "${validatedKey}" to "${args.value}"`));
-            }
+            delete config[keyFromAllowedKey];
+            this.log(chalk.green(`✅ Removed "${keyFromAllowedKey}"`));
+        } else {
+            config[keyFromAllowedKey] = args.value;
+            this.log(chalk.green(`✅ Set "${keyFromAllowedKey}" to "${args.value}"`));
+        }
 
         await saveUserConfig(this.commandId, config, flags.global);
         this.log(chalk.cyan(`📂 Configuration saved at ${configPath}`));
@@ -144,13 +165,11 @@ export abstract class BaseConfigCommand extends Command {
 
     protected validateKey(key: string) {
         const lowerCaseKey = key.toLowerCase();
-        const foundKey = this.allowedKeys.find(allowedKey => {
-            const keyFromAllowedKey = this.getKeyFromAllowedKey(allowedKey);
-            return keyFromAllowedKey.toLowerCase() === lowerCaseKey;
-        });
+        const foundKey = this.allowedKeys.find(allowedKey => this.getKeyFromAllowedKey(allowedKey).toLowerCase() === lowerCaseKey);
 
         if (!foundKey) {
-            this.error(chalk.red(`❌ Invalid key "${key}". Allowed keys: ${this.allowedKeys.map(allowedKey => this.getKeyFromAllowedKey(allowedKey)).join(", ")}`));
+            const allowedKeyNames = this.allowedKeys.map(k => this.getKeyFromAllowedKey(k)).join(", ");
+            this.error(chalk.red(`❌ Invalid key "${key}". Allowed keys: ${allowedKeyNames}`));
         }
 
         return foundKey;

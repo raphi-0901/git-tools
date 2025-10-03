@@ -14,6 +14,28 @@ export default class Index extends Command {
         }),
     };
     static description = "Creates an WIP-snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating the snapshot.";
+    static examples = [
+        {
+            command: '<%= config.bin %> <%= command.id %>',
+            description: "Create a WIP snapshot with the default message",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> "My snapshot message"',
+            description: "Create a WIP snapshot with a custom message",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> --nukeWorkingTree',
+            description: "Create a WIP snapshot and nuke the working tree",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> "My snapshot message" --nukeWorkingTree',
+            description: "Create a WIP snapshot with a custom message and nuke the working tree",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> "My snapshot message" -f',
+            description: "Shortcut using the -f flag to nuke the working tree",
+        }
+    ];
     static flags = {
         nukeWorkingTree: Flags.boolean({
             char: "f",

@@ -16,6 +16,20 @@ export default class List extends Command {
         }),
     };
     static description = "Restore a WIP-snapshot.";
+    static examples = [
+        {
+            command: '<%= config.bin %> <%= command.id %>',
+            description: "Restore a snapshot by selecting from the interactive list",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> 3',
+            description: "Restore a snapshot by its ID",
+        },
+        {
+            command: '<%= config.bin %> <%= command.id %> refs/wip/my-branch-123456',
+            description: "Restore a snapshot by its ref",
+        }
+    ];
 
     async getRefName(idOrRef: string | undefined): Promise<string> {
         const wipSnapshots = retrieveWIPSnapshots();

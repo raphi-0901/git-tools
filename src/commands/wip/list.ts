@@ -6,6 +6,12 @@ import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 
 export default class List extends Command {
     static description = "List all available WIP-Snapshots.";
+    static examples = [
+        {
+            command: '<%= config.bin %> <%= command.id %>',
+            description: "List all WIP-Snapshots",
+        }
+    ];
 
     async run(): Promise<void> {
         try {
