@@ -2,11 +2,11 @@ import { input, select } from "@inquirer/prompts";
 import { Args, Command, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { Version2Client } from "jira.js";
-import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
 import { AutoBranchConfig } from "../../types/auto-branch-config.js";
-import {IssueSummary} from "../../types/issue-summary.js";
+import { IssueSummary } from "../../types/issue-summary.js";
+import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
 type RecordKeys<T> = {
@@ -21,8 +21,8 @@ export default class Index extends Command {
             required: true,
         }),
     };
-    static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
-    static flags = {
+static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
+static flags = {
         instructions: Flags.string({
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
@@ -49,24 +49,25 @@ export default class Index extends Command {
         }
 
         const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "";
-        const messages = this.buildInitialMessages(issue, instructions);
-        const client = new OpenAI.OpenAI({ apiKey: groqApiKey, baseURL: "https://api.groq.com/openai/v1" });
+        const initialMessages = this.buildInitialMessages(issue, instructions);
+
+        const chat = new LLMChat(groqApiKey, initialMessages);
 
         let finished = false;
         /* eslint-disable no-await-in-loop */
         while (!finished) {
-            const branchName = await this.generateBranchName(client, messages);
+            const branchName = await chat.generate();
 
             if (!branchName) {
                 this.error(chalk.red("❌ No branch name received from Groq API"));
             }
 
-            finished = await this.handleUserDecision(branchName, messages);
+            finished = await this.handleUserDecision(branchName, chat);
         }
         /* eslint-enable no-await-in-loop */
     }
 
-    private buildInitialMessages(issue: IssueSummary, instructions: string) {
+    private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {
         return [
             {
                 content:
@@ -82,19 +83,7 @@ Ticket Description: "${issue.description}"
                 `,
                 role: "user",
             },
-        ] as OpenAI.OpenAI.Chat.ChatCompletionMessageParam[];
-    }
-
-    private async generateBranchName(
-        client: OpenAI.OpenAI,
-        messages: OpenAI.OpenAI.Chat.ChatCompletionMessageParam[]
-    ) {
-        const response = await client.chat.completions.create({
-            messages,
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.4,
-        });
-        return response.choices[0]?.message?.content?.trim() ?? "";
+        ];
     }
 
     private async getIssue(
@@ -113,14 +102,12 @@ Ticket Description: "${issue.description}"
         const isTimeout = (error?: object) => error &&
             typeof error === 'object' &&
             'code' in error &&
-            (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT')
+            (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT');
 
         const fetchIssue = async (auth: Authentication) => {
             const client = new Version2Client({
                 authentication: auth,
-                baseRequestConfig: {
-                    timeout: 5000
-                },
+                baseRequestConfig: { timeout: 5000 },
                 host
             });
             return client.issues.getIssue({ issueIdOrKey: issueId });
@@ -151,10 +138,7 @@ Ticket Description: "${issue.description}"
         };
     }
 
-    private async handleUserDecision(
-        branchName: string,
-        messages: OpenAI.OpenAI.Chat.ChatCompletionMessageParam[],
-    ) {
+    private async handleUserDecision(branchName: string, chat: LLMChat) {
         const git = simpleGit();
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
@@ -190,7 +174,7 @@ Ticket Description: "${issue.description}"
 
             case "feedback": {
                 const feedback = await input({ message: "Provide your feedback for the LLM:" });
-                messages.push({ content: feedback, role: "user" });
+                chat.addMessage(feedback, "user");
                 return false;
             }
 
@@ -205,9 +189,7 @@ Ticket Description: "${issue.description}"
         issueIdOrLink: string,
         userConfig: Partial<AutoBranchConfig>
     ) {
-        if (!userConfig[field]) {
-            return null;
-        }
+        if (!userConfig[field]) return null;
 
         try {
             const url = new URL(issueIdOrLink);
@@ -227,10 +209,7 @@ Ticket Description: "${issue.description}"
         }
     }
 
-    private validateRequiredConfig(
-        argsIssueId: string,
-        userConfig: Partial<AutoBranchConfig>
-    ) {
+    private validateRequiredConfig(argsIssueId: string, userConfig: Partial<AutoBranchConfig>) {
         const requiredFields: Record<string, null | string | undefined> = {
             API_KEY: this.parseFieldFromConfig("API_KEY", argsIssueId, userConfig),
             EMAIL: this.parseFieldFromConfig("EMAIL", argsIssueId, userConfig),
