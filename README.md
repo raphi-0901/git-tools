@@ -16,11 +16,11 @@ A new CLI generated with oclif
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g git-tools
+$ npm install -g @rwirnsberger/git-tools
 $ git-tools COMMAND
 running command...
 $ git-tools (--version)
-git-tools/0.0.0 linux-x64 node-v22.14.0
+@rwirnsberger/git-tools/1.0.0 linux-x64 node-v22.14.0
 $ git-tools --help [COMMAND]
 USAGE
   $ git-tools COMMAND
@@ -29,369 +29,155 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
-* [`git-tools hello PERSON`](#git-tools-hello-person)
-* [`git-tools hello world`](#git-tools-hello-world)
-* [`git-tools help [COMMAND]`](#git-tools-help-command)
-* [`git-tools plugins`](#git-tools-plugins)
-* [`git-tools plugins add PLUGIN`](#git-tools-plugins-add-plugin)
-* [`git-tools plugins:inspect PLUGIN...`](#git-tools-pluginsinspect-plugin)
-* [`git-tools plugins install PLUGIN`](#git-tools-plugins-install-plugin)
-* [`git-tools plugins link PATH`](#git-tools-plugins-link-path)
-* [`git-tools plugins remove [PLUGIN]`](#git-tools-plugins-remove-plugin)
-* [`git-tools plugins reset`](#git-tools-plugins-reset)
-* [`git-tools plugins uninstall [PLUGIN]`](#git-tools-plugins-uninstall-plugin)
-* [`git-tools plugins unlink [PLUGIN]`](#git-tools-plugins-unlink-plugin)
-* [`git-tools plugins update`](#git-tools-plugins-update)
+* [`git-tools auto-branch ISSUEID`](#git-tools-auto-branch-issueid)
+* [`git-tools auto-branch config [KEY] [VALUE]`](#git-tools-auto-branch-config-key-value)
+* [`git-tools auto-commit`](#git-tools-auto-commit)
+* [`git-tools auto-commit config [KEY] [VALUE]`](#git-tools-auto-commit-config-key-value)
+* [`git-tools wip [NAME]`](#git-tools-wip-name)
+* [`git-tools wip delete`](#git-tools-wip-delete)
+* [`git-tools wip list`](#git-tools-wip-list)
+* [`git-tools wip restore [IDORREF]`](#git-tools-wip-restore-idorref)
 
-## `git-tools hello PERSON`
+## `git-tools auto-branch ISSUEID`
 
-Say hello
+Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
 
 ```
 USAGE
-  $ git-tools hello PERSON -f <value>
+  $ git-tools auto-branch ISSUEID [-i <value>]
 
 ARGUMENTS
-  PERSON  Person to say hello to
+  ISSUEID  Jira issue ID to fetch
 
 FLAGS
-  -f, --from=<value>  (required) Who is saying hello
+  -i, --instructions=<value>  Provide a specific instruction to the model for the commit message
 
 DESCRIPTION
-  Say hello
-
-EXAMPLES
-  $ git-tools hello friend --from oclif
-  hello friend from oclif! (./src/commands/hello/index.ts)
+  Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
 ```
 
-_See code: [src/commands/hello/index.ts](https://github.com/raphi-0901/git-tools/blob/v0.0.0/src/commands/hello/index.ts)_
+_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-branch/index.ts)_
 
-## `git-tools hello world`
-
-Say hello world
+## `git-tools auto-branch config [KEY] [VALUE]`
 
 ```
 USAGE
-  $ git-tools hello world
-
-DESCRIPTION
-  Say hello world
-
-EXAMPLES
-  $ git-tools hello world
-  hello world! (./src/commands/hello/world.ts)
-```
-
-_See code: [src/commands/hello/world.ts](https://github.com/raphi-0901/git-tools/blob/v0.0.0/src/commands/hello/world.ts)_
-
-## `git-tools help [COMMAND]`
-
-Display help for git-tools.
-
-```
-USAGE
-  $ git-tools help [COMMAND...] [-n]
+  $ git-tools auto-branch config [KEY] [VALUE] [--global]
 
 ARGUMENTS
-  COMMAND...  Command to show help for.
+  KEY    Configuration key to set or get
+  VALUE  Value for the configuration key (leave empty to get current value). For host-specific values: host=value
 
 FLAGS
-  -n, --nested-commands  Include all nested commands in the output.
-
-DESCRIPTION
-  Display help for git-tools.
+  --global  Set configuration globally
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.33/src/commands/help.ts)_
+_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-branch/config.ts)_
 
-## `git-tools plugins`
+## `git-tools auto-commit`
 
-List installed plugins.
+Automatically generate commit messages from staged files with feedback loop
 
 ```
 USAGE
-  $ git-tools plugins [--json] [--core]
+  $ git-tools auto-commit [-i <value>]
 
 FLAGS
-  --core  Show core plugins.
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  -i, --instructions=<value>  Provide a specific instruction to the model for the commit message
 
 DESCRIPTION
-  List installed plugins.
-
-EXAMPLES
-  $ git-tools plugins
+  Automatically generate commit messages from staged files with feedback loop
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/index.ts)_
+_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-commit/index.ts)_
 
-## `git-tools plugins add PLUGIN`
-
-Installs a plugin into git-tools.
+## `git-tools auto-commit config [KEY] [VALUE]`
 
 ```
 USAGE
-  $ git-tools plugins add PLUGIN... [--json] [-f] [-h] [-s | -v]
+  $ git-tools auto-commit config [KEY] [VALUE] [--global]
 
 ARGUMENTS
-  PLUGIN...  Plugin to install.
+  KEY    Configuration key to set or get
+  VALUE  Value for the configuration key (leave empty to get current value). For host-specific values: host=value
 
 FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Installs a plugin into git-tools.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the GIT_TOOLS_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the GIT_TOOLS_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ git-tools plugins add
-
-EXAMPLES
-  Install a plugin from npm registry.
-
-    $ git-tools plugins add myplugin
-
-  Install a plugin from a github url.
-
-    $ git-tools plugins add https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ git-tools plugins add someuser/someplugin
+  --global  Set configuration globally
 ```
 
-## `git-tools plugins:inspect PLUGIN...`
+_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/auto-commit/config.ts)_
 
-Displays installation properties of a plugin.
+## `git-tools wip [NAME]`
+
+Creates an WIP-snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating the snapshot.
 
 ```
 USAGE
-  $ git-tools plugins inspect PLUGIN...
+  $ git-tools wip [NAME] [-f]
 
 ARGUMENTS
-  PLUGIN...  [default: .] Plugin to inspect.
+  NAME  Message for identifying the WIP-snapshot. Default: WIP-Snapshot
 
 FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  -f, --nukeWorkingTree  Nukes the working tree after creating the snapshot.
 
 DESCRIPTION
-  Displays installation properties of a plugin.
-
-EXAMPLES
-  $ git-tools plugins inspect myplugin
+  Creates an WIP-snapshot of the current branch and saves it as a ref. Optionally nukes the working tree after creating
+  the snapshot.
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/inspect.ts)_
+_See code: [src/commands/wip/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/index.ts)_
 
-## `git-tools plugins install PLUGIN`
+## `git-tools wip delete`
 
-Installs a plugin into git-tools.
+Delete one or more WIP-Snapshots interactively.
 
 ```
 USAGE
-  $ git-tools plugins install PLUGIN... [--json] [-f] [-h] [-s | -v]
+  $ git-tools wip delete [--all]
+
+FLAGS
+  --all  Delete all WIP-Snapshots without prompting for selection.
+
+DESCRIPTION
+  Delete one or more WIP-Snapshots interactively.
+
+EXAMPLES
+  $ mycli delete
+
+  $ mycli delete --all
+```
+
+_See code: [src/commands/wip/delete.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/delete.ts)_
+
+## `git-tools wip list`
+
+List all available WIP-Snapshots.
+
+```
+USAGE
+  $ git-tools wip list
+
+DESCRIPTION
+  List all available WIP-Snapshots.
+```
+
+_See code: [src/commands/wip/list.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/list.ts)_
+
+## `git-tools wip restore [IDORREF]`
+
+Restore a WIP-snapshot.
+
+```
+USAGE
+  $ git-tools wip restore [IDORREF]
 
 ARGUMENTS
-  PLUGIN...  Plugin to install.
-
-FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  IDORREF  ID or ref of the WIP-snapshot to restore. If not provided, a list of all snapshots will be shown.
 
 DESCRIPTION
-  Installs a plugin into git-tools.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the GIT_TOOLS_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the GIT_TOOLS_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ git-tools plugins add
-
-EXAMPLES
-  Install a plugin from npm registry.
-
-    $ git-tools plugins install myplugin
-
-  Install a plugin from a github url.
-
-    $ git-tools plugins install https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ git-tools plugins install someuser/someplugin
+  Restore a WIP-snapshot.
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/install.ts)_
-
-## `git-tools plugins link PATH`
-
-Links a plugin into the CLI for development.
-
-```
-USAGE
-  $ git-tools plugins link PATH [-h] [--install] [-v]
-
-ARGUMENTS
-  PATH  [default: .] path to plugin
-
-FLAGS
-  -h, --help          Show CLI help.
-  -v, --verbose
-      --[no-]install  Install dependencies after linking the plugin.
-
-DESCRIPTION
-  Links a plugin into the CLI for development.
-
-  Installation of a linked plugin will override a user-installed or core plugin.
-
-  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello'
-  command will override the user-installed or core plugin implementation. This is useful for development work.
-
-
-EXAMPLES
-  $ git-tools plugins link myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/link.ts)_
-
-## `git-tools plugins remove [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ git-tools plugins remove [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ git-tools plugins unlink
-  $ git-tools plugins remove
-
-EXAMPLES
-  $ git-tools plugins remove myplugin
-```
-
-## `git-tools plugins reset`
-
-Remove all user-installed and linked plugins.
-
-```
-USAGE
-  $ git-tools plugins reset [--hard] [--reinstall]
-
-FLAGS
-  --hard       Delete node_modules and package manager related files in addition to uninstalling plugins.
-  --reinstall  Reinstall all plugins after uninstalling.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/reset.ts)_
-
-## `git-tools plugins uninstall [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ git-tools plugins uninstall [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ git-tools plugins unlink
-  $ git-tools plugins remove
-
-EXAMPLES
-  $ git-tools plugins uninstall myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/uninstall.ts)_
-
-## `git-tools plugins unlink [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ git-tools plugins unlink [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ git-tools plugins unlink
-  $ git-tools plugins remove
-
-EXAMPLES
-  $ git-tools plugins unlink myplugin
-```
-
-## `git-tools plugins update`
-
-Update installed plugins.
-
-```
-USAGE
-  $ git-tools plugins update [-h] [-v]
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Update installed plugins.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.47/src/commands/plugins/update.ts)_
+_See code: [src/commands/wip/restore.ts](https://github.com/raphi-0901/git-tools/blob/v1.0.0/src/commands/wip/restore.ts)_
 <!-- commandsstop -->
