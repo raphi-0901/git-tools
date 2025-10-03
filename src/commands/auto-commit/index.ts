@@ -1,10 +1,10 @@
 import { input, select } from "@inquirer/prompts";
 import { Command, Flags } from "@oclif/core";
 import chalk from "chalk";
-import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
 import { AutoCommitConfig } from "../../types/auto-commit-config.js";
+import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
 export default class Index extends Command {
@@ -37,12 +37,8 @@ export default class Index extends Command {
         const currentBranch = branchSummary.current;
 
         const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "Keep it short and conventional";
-        const client = new OpenAI.OpenAI({
-            apiKey: userConfig.GROQ_API_KEY,
-            baseURL: "https://api.groq.com/openai/v1",
-        });
 
-        const messages: OpenAI.OpenAI.Chat.ChatCompletionMessageParam[] = [
+        const initialMessages: ChatMessage[] = [
             {
                 content:
                     "You are an assistant that generates concise, clear Git commit messages. Only output the commit message itself.",
@@ -60,20 +56,15 @@ ${diff}
             },
         ];
 
+        const chat = new LLMChat(userConfig.GROQ_API_KEY, initialMessages);
+
         let finished = false;
         let commitMessage = "";
 
         /* eslint-disable no-await-in-loop */
         while (!finished) {
-            const response = await client.chat.completions.create({
-                messages,
-                // model: "llama-3.3-70b-versatile",
-                // model: "openai/gpt-oss-20b",
-                model: "openai/gpt-oss-120b",
-                temperature: 0.4,
-            });
+            commitMessage = await chat.generate();
 
-            commitMessage = response.choices[0]?.message?.content?.trim() ?? "";
             if (!commitMessage) {
                 this.error(chalk.red("❌ No commit message received from Groq API"));
                 return;
@@ -121,7 +112,7 @@ ${diff}
                     const feedback = await input({
                         message: "Provide your feedback for the LLM:",
                     });
-                    messages.push({ content: feedback, role: "user" });
+                    chat.addMessage(feedback, "user");
                     break;
                 }
             }
