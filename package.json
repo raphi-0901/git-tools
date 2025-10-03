@@ -17,6 +17,7 @@
     "inquirer": "^12.9.6",
     "jira.js": "^5.2.2",
     "openai": "^5.23.0",
+    "deepmerge-ts": "^7.1.5",
     "simple-git": "^3.28.0"
   },
   "devDependencies": {
@@ -28,7 +29,6 @@
     "@types/mocha": "^10",
     "@types/node": "^18",
     "chai": "^4",
-    "deepmerge-ts": "^7.1.5",
     "eslint": "^9",
     "eslint-config-oclif": "^6",
     "eslint-config-prettier": "^10",
