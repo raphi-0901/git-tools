@@ -6,17 +6,12 @@ import * as OpenAI from "openai";
 import { simpleGit } from "simple-git";
 
 import { AutoBranchConfig } from "../../types/auto-branch-config.js";
+import {IssueSummary} from "../../types/issue-summary.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
 type RecordKeys<T> = {
     [K in keyof T]: T[K] extends Record<string, unknown> ? K : never;
 }[keyof T];
-
-type IssueSummary = {
-    description: string;
-    summary: string;
-    ticketId: string;
-}
 
 export default class Index extends Command {
     static args = {
