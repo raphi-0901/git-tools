@@ -1,17 +1,15 @@
-import { Version2Client } from "jira.js";
-
 import {IssueSummary} from "../types/issue-summary.js";
-import { IssueService } from "./issue-service";
+import {IssueService} from "./issue-service.js";
 
-export class JiraServiceV2Pat implements IssueService {
+export class JiraV2PatService implements IssueService {
     constructor(private apiKey: string) {}
 
-    async getIssue(issueUrl: string): Promise<IssueSummary | null> {
+    async getIssue(issueUrl: URL): Promise<IssueSummary | null> {
         // pass all values from url
         return null;
 
-        // const pathParts = issueIdOrUrl.split("/");
-        // const issueId = pathParts.at(-1) ?? issueIdOrUrl;
+        // const pathParts = issueUrl.split("/");
+        // const issueId = pathParts.at(-1) ?? issueUrl;
         // const host = `https://${this.hostname}`;
 
         // const client = new Version2Client({
@@ -31,7 +29,7 @@ export class JiraServiceV2Pat implements IssueService {
         // }
     }
 
-    getIssueName(): string {
-        return "jira-v2-pat";
+    getIssueName() {
+        return "jira-v2-pat" as const;
     }
 }

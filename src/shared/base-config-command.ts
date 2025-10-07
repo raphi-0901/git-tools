@@ -131,8 +131,6 @@ export abstract class BaseConfigCommand extends Command {
             return;
         }
 
-
-
         // Handle host-specific keys
         if (this.isHostSpecific(validatedKey) && args.value.includes("=") && args.value.includes(":")) {
 

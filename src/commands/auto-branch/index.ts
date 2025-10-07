@@ -1,63 +1,69 @@
 import { input, select } from "@inquirer/prompts";
 import { Args, Command, Flags } from "@oclif/core";
 import chalk from "chalk";
-import { Version2Client } from "jira.js";
 import { simpleGit } from "simple-git";
 
-import {getService} from "../../services/index.js";
-import {ISSUE_SERVICE_TYPES} from "../../services/issue-service.js";
+import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
 import { AutoBranchConfig } from "../../types/auto-branch-config.js";
+import {ISSUE_SERVICE_TYPES, IssueServiceConfig, IssueServiceType} from "../../types/issue-service-type.js";
 import { IssueSummary } from "../../types/issue-summary.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
-type RecordKeys<T> = {
-    [K in keyof T]: T[K] extends Record<string, unknown> ? K : never;
-}[keyof T];
-
 export default class Index extends Command {
     static args = {
-        issueId: Args.string({
+        issueUrl: Args.string({
             description: "Jira issue ID to fetch",
-            name: "issueId",
+            name: "issueUrl",
             required: true,
         }),
     };
-static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
-static flags = {
-        instructions: Flags.string({
-            char: "i",
-            description: "Provide a specific instruction to the model for the commit message",
-        }),
-    };
+    static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
+    static flags = {
+            instructions: Flags.string({
+                char: "i",
+                description: "Provide a specific instruction to the model for the commit message",
+            }),
+        };
 
     async run() {
         const { args, flags } = await this.parse(Index);
         const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, "auto-branch");
-        const { apiKey, email, groqApiKey } = this.validateRequiredConfig(args.issueId, userConfig);
+        if (!userConfig.GROQ_API_KEY) {
+            this.error(chalk.red("❌ No GROQ_API_KEY set in your config."))
+        }
 
-        const { hostname, issueId: parsedIssueId } = this.parseUrl(args.issueId);
-        const finalHostname = hostname ?? userConfig.DEFAULT_HOSTNAME;
-        if (!finalHostname) {
+        if(!URL.canParse(args.issueUrl)) {
+            this.error(chalk.red(`❌ IssueUrl was not a URL.`));
+        }
+
+        const issueUrl = new URL(args.issueUrl);
+        const {hostname} = issueUrl;
+        if (!hostname) {
             this.error(chalk.red("❌ No DEFAULT_HOSTNAME set and issue does not contain full URL"));
         }
 
-        let issue: IssueSummary | null = null;
-        let usedService: null | string = null;
-
-        for (const svc of ISSUE_SERVICE_TYPES) {
-            try {
-                issue = await getService(svc, {
-                    token: "",
-                    type: svc,
-                }).getIssue(args.issueId);
-                if (issue) {
-                    usedService = svc;
-                    break;
-                }
-            } catch {}
+        const allHostnamesFromConfig = userConfig.HOSTNAMES ?? {};
+        if(allHostnamesFromConfig[hostname] === undefined) {
+            this.error(chalk.red(`❌ No config found for hostname: ${hostname}`));
         }
 
+        const serviceType = allHostnamesFromConfig[hostname].type as IssueServiceType;
+        if(!ISSUE_SERVICE_TYPES.includes(serviceType)) {
+            this.error(chalk.red(`❌ Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${ISSUE_SERVICE_TYPES.join(", ")}`));
+        }
+
+        const serviceConfig = allHostnamesFromConfig[hostname]!;
+        const missingFields = this.getMissingFields(serviceConfig);
+
+        if (missingFields.length > 0) {
+            this.error(chalk.red(
+                `❌ Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`
+            ));
+        }
+
+        const service = getService(serviceType, serviceConfig);
+        const issue = await service.getIssue(new URL(args.issueUrl))
         if (!issue) {
             this.error(chalk.red(
                 "❌ No issue found for the provided ID. Check the URL or API key. " +
@@ -65,10 +71,10 @@ static flags = {
             ));
         }
 
-        const instructions = flags.instructions ?? userConfig.INSTRUCTIONS ?? "";
+        const instructions = flags.instructions ?? serviceConfig.instructions;
         const initialMessages = this.buildInitialMessages(issue, instructions);
 
-        const chat = new LLMChat(groqApiKey, initialMessages);
+        const chat = new LLMChat(userConfig.GROQ_API_KEY, initialMessages);
 
         let finished = false;
         /* eslint-disable no-await-in-loop */
@@ -88,7 +94,7 @@ static flags = {
         return [
             {
                 content:
-                    "You are an assistant that generates git branch names based on the summary and description of a JIRA ticket. Only output the branch name itself.",
+                    "You are an assistant that generates git branch names based on the summary and description of a ticket. Only output the branch name itself. Take the user instruction into account.",
                 role: "system",
             },
             {
@@ -101,6 +107,13 @@ Ticket Description: "${issue.description}"
                 role: "user",
             },
         ];
+    }
+
+    private getMissingFields<T extends IssueServiceConfig>(service: T): (keyof T)[] {
+        const requiredFields = REQUIRED_FIELDS_BY_TYPE[service.type] as (keyof T)[];
+        return requiredFields.filter(
+            (field) => service[field] === undefined || service[field] === ""
+        );
     }
 
     private async handleUserDecision(branchName: string, chat: LLMChat) {
@@ -147,52 +160,5 @@ Ticket Description: "${issue.description}"
                 return true;
             }
         }
-    }
-
-    private parseFieldFromConfig(
-        field: RecordKeys<AutoBranchConfig>,
-        issueIdOrLink: string,
-        userConfig: Partial<AutoBranchConfig>
-    ) {
-        if (!userConfig[field]) return null;
-
-        try {
-            const url = new URL(issueIdOrLink);
-            return userConfig[field][url.hostname] ?? userConfig[field][userConfig.DEFAULT_HOSTNAME!];
-        } catch {
-            return userConfig[field][userConfig.DEFAULT_HOSTNAME!];
-        }
-    }
-
-    private parseUrl(issueIdOrLink: string) {
-        try {
-            const url = new URL(issueIdOrLink);
-            const pathParts = url.pathname.replace(/\/$/, "").split("/");
-            return { hostname: url.hostname, issueId: pathParts.at(-1) ?? "" };
-        } catch {
-            return { hostname: null, issueId: issueIdOrLink };
-        }
-    }
-
-    private validateRequiredConfig(argsIssueId: string, userConfig: Partial<AutoBranchConfig>) {
-        const requiredFields: Record<string, null | string | undefined> = {
-            API_KEY: this.parseFieldFromConfig("API_KEY", argsIssueId, userConfig),
-            EMAIL: this.parseFieldFromConfig("EMAIL", argsIssueId, userConfig),
-            GROQ_API_KEY: userConfig.GROQ_API_KEY,
-        };
-
-        const missingFields = Object.entries(requiredFields)
-            .filter(([_, value]) => !value)
-            .map(([key]) => key);
-
-        if (missingFields.length > 0) {
-            this.error(chalk.red(`❌ Missing required fields in config: ${missingFields.join(", ")}`));
-        }
-
-        return {
-            apiKey: requiredFields.API_KEY!,
-            email: requiredFields.EMAIL!,
-            groqApiKey: requiredFields.GROQ_API_KEY!,
-        };
     }
 }
