@@ -38,10 +38,7 @@ export default class AutoBranchConfigCommand extends BaseConfigCommand {
             allowedKeys: [
                 {
                     isObject: true,
-                    key: "API_KEY",
-                },{
-                    isObject: true,
-                    key: "EMAIL",
+                    key: "HOSTNAMES",
                 },
                 "GROQ_API_KEY",
                 "INSTRUCTIONS",

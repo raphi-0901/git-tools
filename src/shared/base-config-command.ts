@@ -1,12 +1,12 @@
-import { Args, Command, Flags } from "@oclif/core";
+import {Args, Command, Flags} from "@oclif/core";
 import chalk from "chalk";
+import { deepmerge } from "deepmerge-ts";
 
-import { UserConfig } from "../types/user-config.js";
+import {UserConfig} from "../types/user-config.js";
 import {
     getConfigFilePath,
     loadGlobalUserConfig,
     loadLocalUserConfig,
-    loadUserConfig,
     loadUserConfigForOutput,
     saveUserConfig
 } from "../utils/user-config.js";
@@ -36,8 +36,8 @@ export abstract class BaseConfigCommand extends Command {
     };
     protected static example = []
     static flags = {
-            global: Flags.boolean({ description: "Set configuration globally" }),
-        };
+        global: Flags.boolean({description: "Set configuration globally"}),
+    };
     protected allowedKeys: AllowedKey[];
     protected commandId: string;
 
@@ -79,8 +79,8 @@ export abstract class BaseConfigCommand extends Command {
             this.log(chalk.blue(`ℹ️ No value set for "${keyFromAllowedKey}" (${typeInfo})`));
 
             const helpText = isHostSpecific
-            ? chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <host>=<value>`)
-            : chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <value>`)
+                ? chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <host>=<value>`)
+                : chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <value>`)
             this.log(helpText);
         } else if (typeof value === "object" && value !== null) {
             this.log(chalk.blue(`ℹ️ Current values for "${keyFromAllowedKey}" (${typeInfo}):`));
@@ -93,9 +93,8 @@ export abstract class BaseConfigCommand extends Command {
         }
     }
 
-
     protected async runConfigLogic(): Promise<void> {
-        const { args, flags } = await this.parse(BaseConfigCommand);
+        const {args, flags} = await this.parse(BaseConfigCommand);
         const configPath = await getConfigFilePath(this.commandId, flags.global);
 
         // If no key is provided, show full configuration
@@ -132,24 +131,32 @@ export abstract class BaseConfigCommand extends Command {
             return;
         }
 
+
+
         // Handle host-specific keys
-        if (args.value.includes("=") && this.isHostSpecific(validatedKey)) {
-            const [host, hostValue] = args.value.split(/=(.+)/);
-            if (!host) {
-                this.error(chalk.red(`❌ Invalid format. Use "hostname=value" for host-specific keys.`));
+        if (this.isHostSpecific(validatedKey) && args.value.includes("=") && args.value.includes(":")) {
+
+            const indexOfFirstEqualSign = args.value.indexOf('=');
+            if (indexOfFirstEqualSign === -1) {
+                throw new Error('❌ Invalid format. Use "hostname:subkey=value".');
             }
 
-            if (!config[keyFromAllowedKey] || typeof config[keyFromAllowedKey] !== "object") {
+            const value = args.value.slice(indexOfFirstEqualSign + 1);
+            let keyObj = config[keyFromAllowedKey] as undefined | UserConfig;
+
+            if(keyObj === undefined)
+            {
                 config[keyFromAllowedKey] = {};
+                keyObj = config[keyFromAllowedKey] as UserConfig;
             }
 
-            const keyObj = config[keyFromAllowedKey] as UserConfig;
-            if (hostValue === "") {
-                delete keyObj[host];
-                this.log(chalk.green(`✅ Removed host "${host}" from "${keyFromAllowedKey}"`));
+            if (value === "") {
+                delete keyObj[keyFromAllowedKey];
+                this.log(chalk.green(`✅ Removed "${keyFromAllowedKey}"`));
             } else {
-                keyObj[host] = hostValue;
-                this.log(chalk.green(`✅ Set "${keyFromAllowedKey}" for host "${host}" to "${hostValue}"`));
+                const keyPart = args.value.slice(0, indexOfFirstEqualSign);
+                config[keyFromAllowedKey] = deepmerge(config[keyFromAllowedKey] ?? {}, this.convertStringToObject(keyPart, value));
+                this.log(chalk.green(`✅ Set "${keyFromAllowedKey}"`));
             }
         } else if (args.value === "") {
             delete config[keyFromAllowedKey];
@@ -163,6 +170,7 @@ export abstract class BaseConfigCommand extends Command {
         this.log(chalk.cyan(`📂 Configuration saved at ${configPath}`));
     }
 
+
     protected validateKey(key: string) {
         const lowerCaseKey = key.toLowerCase();
         const foundKey = this.allowedKeys.find(allowedKey => this.getKeyFromAllowedKey(allowedKey).toLowerCase() === lowerCaseKey);
@@ -173,5 +181,31 @@ export abstract class BaseConfigCommand extends Command {
         }
 
         return foundKey;
+    }
+
+    private convertStringToObject(path: string, value: string)
+    {
+        const keys = path.split(':');
+        const dataModel = {} as Record<string, object | string>;
+        let object = dataModel;
+        while (keys.length > 0)
+        {
+            const part = keys.shift();
+            if(part === undefined) {
+                break;
+            }
+
+            if (keys.length > 0 )
+            {
+                object[part] = {};
+                object = object[part] as Record<string, object | string>;
+            }
+            else
+            {
+                object[part] = value;
+            }
+        }
+
+        return dataModel;
     }
 }
