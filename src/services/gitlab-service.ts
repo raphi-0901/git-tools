@@ -1,32 +1,51 @@
-import {IssueSummary} from "../types/issue-summary.js";
-import {IssueService} from "./issue-service.js";
+import { Gitlab } from "@gitbeaker/rest";
+
+import { IssueSummary } from "../types/issue-summary.js";
+import { IssueService } from "./issue-service.js";
 
 export class GitLabService implements IssueService {
+
     constructor(private apiKey: string) {}
 
     async getIssue(issueUrl: URL): Promise<IssueSummary | null> {
-        // pass all values from url
-        return null;
+        try {
+            // Example: https://gitlab.com/group/project/-/issues/42
+            const pathParts = issueUrl.pathname.split("/").filter(Boolean);
+            const issueIndex = pathParts.indexOf("issues");
+            if (issueIndex === -1 || issueIndex === 0) {
+                return null;
+            }
 
-        // const pathParts = issueUrl.split("/");
-        // const issueId = pathParts.at(-1) ?? issueUrl;
-        // const host = `https://${this.hostname}`;
+            const issueNumberStr = pathParts[issueIndex + 1];
+            const issueNumber = Number.parseInt(issueNumberStr, 10);
+            if (Number.isNaN(issueNumber)) {
+                return null;
+            }
 
-        // const client = new Version2Client({
-        //     authentication: { basic: { apiToken: this.apiKey, email: this.email } },
-        //     host,
-        // });
-        //
-        // try {
-        //     const issue = await client.issues.getIssue({ issueIdOrKey: issueId });
-        //     return {
-        //         ticketId: issue.key,
-        //         summary: issue.fields.summary,
-        //         description: issue.fields.description || "",
-        //     };
-        // } catch {
-        //     return null;
-        // }
+            // The project path is everything before "/-/issues/{id}"
+            // (e.g. "group/subgroup/project")
+            const projectPathParts = pathParts.slice(0, issueIndex - 1);
+            const projectId = projectPathParts.join("/");
+
+            const client = new Gitlab({
+                host: issueUrl.origin,
+                token: this.apiKey,
+            });
+
+            // Fetch issue using GitLab API
+            const issue = await client.Issues.show(issueNumber, {
+                projectId
+            });
+
+            return {
+                description: issue.description || "",
+                summary: issue.title,
+                ticketId: String(issue.iid),
+            };
+        } catch (error) {
+            console.error("Failed to fetch GitLab issue:", error);
+            return null;
+        }
     }
 
     getIssueName() {
