@@ -15,21 +15,30 @@ export async function loadUserConfig<T>(ctx: Command, commandId: string): Promis
     return deepmerge(globalConfig, localConfig) as T;
 }
 
+function markGlobal<T>(value: T): T {
+    if (typeof value === "string") {
+        return `${value} (global)` as unknown as T;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => markGlobal(item)) as unknown as T;
+    }
+
+    if (value && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value).map(([k, v]) => [k, markGlobal(v)])
+        ) as unknown as T;
+    }
+
+    return value;
+}
+
+
 export async function loadUserConfigForOutput<T extends UserConfig>(ctx: Command, commandId: string): Promise<T> {
-    const globalConfig = await loadGlobalUserConfig<T>(ctx, commandId);
-    const localConfig = await loadLocalUserConfig<T>(ctx, commandId);
+    const globalConfig = await loadGlobalUserConfig<Partial<T>>(ctx, commandId);
+    const localConfig = await loadLocalUserConfig<Partial<T>>(ctx, commandId);
 
-    const globalWithMarker = Object.fromEntries(
-        Object.entries(globalConfig).map(([key, value]) => {
-            if(typeof value === "string") {
-                return [key, `${value} (global)`]
-            }
-
-            const populatedValue = Object.fromEntries(Object.entries(value).map(([subKey, subValue]) => [subKey, `${subValue} (global)`]))
-
-            return [key, populatedValue]
-        })
-    ) as T;
+    const globalWithMarker = markGlobal(globalConfig) as T;
 
     return deepmerge(globalWithMarker, localConfig) as T;
 }
