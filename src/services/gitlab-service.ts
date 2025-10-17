@@ -42,8 +42,7 @@ export class GitLabService implements IssueService {
                 summary: issue.title,
                 ticketId: String(issue.iid),
             };
-        } catch (error) {
-            console.error("Failed to fetch GitLab issue:", error);
+        } catch {
             return null;
         }
     }

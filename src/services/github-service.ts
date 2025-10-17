@@ -38,8 +38,7 @@ export class GitHubService implements IssueService {
                 summary: data.title,
                 ticketId: String(data.number),
             };
-        } catch (error) {
-            console.error("Failed to fetch GitHub issue:", error);
+        } catch {
             return null;
         }
     }
