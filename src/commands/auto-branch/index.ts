@@ -1,14 +1,20 @@
-import { input, select } from "@inquirer/prompts";
-import { Args, Command, Flags } from "@oclif/core";
+import {input, select} from "@inquirer/prompts";
+import {Args, Command, Flags} from "@oclif/core";
 import chalk from "chalk";
-import { simpleGit } from "simple-git";
+import {simpleGit} from "simple-git";
 
 import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
-import { AutoBranchConfig } from "../../types/auto-branch-config.js";
-import {ISSUE_SERVICE_TYPES, IssueServiceConfig, IssueServiceType} from "../../types/issue-service-type.js";
-import { IssueSummary } from "../../types/issue-summary.js";
-import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
-import { loadUserConfig } from "../../utils/user-config.js";
+import {AutoBranchConfig} from "../../types/auto-branch-config.js";
+import {
+    ISSUE_SERVICE_TYPES,
+    IssueServiceConfig,
+    IssueServiceType,
+    SERVICE_DEFINITIONS
+} from "../../types/issue-service-type.js";
+import {IssueSummary} from "../../types/issue-summary.js";
+import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
+import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
+import {loadUserConfig} from "../../utils/user-config.js";
 
 export default class Index extends Command {
     static args = {
@@ -20,49 +26,92 @@ export default class Index extends Command {
     };
     static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
     static flags = {
-            instructions: Flags.string({
-                char: "i",
-                description: "Provide a specific instruction to the model for the commit message",
-            }),
-        };
+        instructions: Flags.string({
+            char: "i",
+            description: "Provide a specific instruction to the model for the commit message",
+        }),
+    };
 
     async run() {
-        const { args, flags } = await this.parse(Index);
-        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, "auto-branch");
-        if (!userConfig.GROQ_API_KEY) {
-            this.error(chalk.red("❌ No GROQ_API_KEY set in your config."))
-        }
+        const {args, flags} = await this.parse(Index);
+        await checkIfInGitRepository(this);
 
-        if(!URL.canParse(args.issueUrl)) {
+        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, "auto-branch");
+
+        if (!URL.canParse(args.issueUrl)) {
             this.error(chalk.red(`❌ IssueUrl was not a URL.`));
         }
 
         const issueUrl = new URL(args.issueUrl);
         const {hostname} = issueUrl;
-        if (!hostname) {
-            this.error(chalk.red("❌ No DEFAULT_HOSTNAME set and issue does not contain full URL"));
+
+        let finalGroqApiKey = userConfig.GROQ_API_KEY;
+        if (!userConfig.GROQ_API_KEY) {
+            this.warn(chalk.red("❌ No GROQ_API_KEY set in your config."))
+
+            finalGroqApiKey = await input({
+                message: "Enter your GROQ API key",
+            });
         }
 
+        let askForSavingHostnameSettings = false;
+        let finalServiceConfigOfHostname: IssueServiceConfig | undefined;
         const allHostnamesFromConfig = userConfig.HOSTNAMES ?? {};
-        if(allHostnamesFromConfig[hostname] === undefined) {
-            this.error(chalk.red(`❌ No config found for hostname: ${hostname}`));
+        if (allHostnamesFromConfig[hostname] === undefined) {
+            this.warn(chalk.red(`❌ No config found for hostname: ${hostname}`));
+
+            // ask for config for hostname
+            const type = await select({
+                choices: ISSUE_SERVICE_TYPES.map(type => ({
+                    description: type,
+                    name: type,
+                    value: type,
+                })),
+                message: 'Select your service type'
+            });
+
+            const requiredFieldsOfService = SERVICE_DEFINITIONS[type]
+            const configForHostname = {
+                type,
+            } as IssueServiceConfig
+
+            for (const key of requiredFieldsOfService.requiredFields) {
+                if (key === "type") {
+                    continue;
+                }
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                // eslint-disable-next-line no-await-in-loop
+                configForHostname[key] = await input({
+                    message: `Enter your ${key}`,
+                });
+            }
+
+            finalServiceConfigOfHostname = configForHostname;
+            askForSavingHostnameSettings = true;
+        } else {
+            const serviceType = allHostnamesFromConfig[hostname].type as IssueServiceType;
+            if (!ISSUE_SERVICE_TYPES.includes(serviceType)) {
+                this.error(chalk.red(`❌ Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${ISSUE_SERVICE_TYPES.join(", ")}`));
+            }
+
+            const serviceConfig = allHostnamesFromConfig[hostname]!;
+            const missingFields = this.getMissingFields(serviceConfig);
+
+            if (missingFields.length > 0) {
+                this.error(chalk.red(
+                    `❌ Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`
+                ));
+            }
+
+            finalServiceConfigOfHostname = serviceConfig;
         }
 
-        const serviceType = allHostnamesFromConfig[hostname].type as IssueServiceType;
-        if(!ISSUE_SERVICE_TYPES.includes(serviceType)) {
-            this.error(chalk.red(`❌ Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${ISSUE_SERVICE_TYPES.join(", ")}`));
-        }
-
-        const serviceConfig = allHostnamesFromConfig[hostname]!;
-        const missingFields = this.getMissingFields(serviceConfig);
-
-        if (missingFields.length > 0) {
-            this.error(chalk.red(
-                `❌ Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`
-            ));
-        }
-
-        const service = getService(serviceType, serviceConfig);
+        console.log('finalServiceConfigOfHostname :>>', finalServiceConfigOfHostname);
+        
+        
+        const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);
         const issue = await service.getIssue(new URL(args.issueUrl))
         if (!issue) {
             this.error(chalk.red(
@@ -71,10 +120,10 @@ export default class Index extends Command {
             ));
         }
 
-        const instructions = flags.instructions ?? serviceConfig.instructions;
+        const instructions = flags.instructions ?? finalServiceConfigOfHostname.instructions;
         const initialMessages = this.buildInitialMessages(issue, instructions);
 
-        const chat = new LLMChat(userConfig.GROQ_API_KEY, initialMessages);
+        const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let finished = false;
         /* eslint-disable no-await-in-loop */
@@ -88,6 +137,20 @@ export default class Index extends Command {
             finished = await this.handleUserDecision(branchName, chat);
         }
         /* eslint-enable no-await-in-loop */
+
+        if (askForSavingHostnameSettings) {
+            const saveSettingsIn = await select({
+                choices: ["No", "Global", "Repository"].map(type => ({
+                    description: type,
+                    name: type,
+                    value: type,
+                })),
+                message: 'Want to save the settings for this hostname?'
+            });
+
+            console.log('saveSettingsIn :>>', saveSettingsIn);
+
+        }
     }
 
     private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {
@@ -123,10 +186,10 @@ Ticket Description: "${issue.description}"
 
         const decision = await select({
             choices: [
-                { name: "✅ Accept and create branch", value: "accept" },
-                { name: "✍️ Edit manually", value: "edit" },
-                { name: "🔁 Provide feedback", value: "feedback" },
-                { name: "❌ Cancel", value: "cancel" },
+                {name: "✅ Accept and create branch", value: "accept"},
+                {name: "✍️ Edit manually", value: "edit"},
+                {name: "🔁 Provide feedback", value: "feedback"},
+                {name: "❌ Cancel", value: "cancel"},
             ],
             message: "What would you like to do?",
         });
@@ -144,14 +207,14 @@ Ticket Description: "${issue.description}"
             }
 
             case "edit": {
-                const userEdit = await input({ default: branchName, message: "Enter your custom branch name:" });
+                const userEdit = await input({default: branchName, message: "Enter your custom branch name:"});
                 await git.checkoutLocalBranch(userEdit);
                 this.log(chalk.green("✅ Branch created with custom name!"));
                 return true;
             }
 
             case "feedback": {
-                const feedback = await input({ message: "Provide your feedback for the LLM:" });
+                const feedback = await input({message: "Provide your feedback for the LLM:"});
                 chat.addMessage(feedback, "user");
                 return false;
             }
