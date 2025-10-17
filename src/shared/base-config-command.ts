@@ -1,6 +1,6 @@
 import {Args, Command, Flags} from "@oclif/core";
 import chalk from "chalk";
-import { deepmerge } from "deepmerge-ts";
+import {deepmerge} from "deepmerge-ts";
 
 import {UserConfig} from "../types/user-config.js";
 import {
@@ -55,15 +55,46 @@ export abstract class BaseConfigCommand extends Command {
         return typeof allowedKey !== "string" && allowedKey.isObject;
     }
 
-    protected logConfiguration(config: UserConfig): void {
+
+    protected logConfiguration(config: Record<string, unknown>, indent = 2): void {
+        const pad = " ".repeat(indent);
+
         for (const [key, value] of Object.entries(config)) {
-            if (typeof value === "object" && value !== null) {
-                this.log(chalk.blue(`  ${key}:`));
-                for (const [subKey, subValue] of Object.entries(value)) {
-                    this.log(`    ${chalk.yellow(subKey)}: ${chalk.green(subValue)}`);
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                // Nested object → recurse
+                this.log(`${pad}${chalk.blue(key)}:`);
+                this.logConfiguration(value as Record<string, unknown>, indent + 2);
+            } else if (Array.isArray(value)) {
+                // Array → print each element on a new line
+                this.log(`${pad}${chalk.yellow(key)}:`);
+                for (const item of value) {
+                    this.log(`${pad}  - ${chalk.green(JSON.stringify(item))}`);
                 }
             } else {
-                this.log(`  ${chalk.yellow(key)}: ${chalk.green(value)}`);
+                // Primitives
+                let formatted: string;
+                switch (typeof value) {
+                    case "boolean": {
+                        formatted = chalk.red(value);
+                        break;
+                    }
+
+                    case "number": {
+                        formatted = chalk.magenta(value);
+                        break;
+                    }
+
+                    case "string": {
+                        formatted = chalk.green(value);
+                        break;
+                    }
+
+                    default: {
+                        formatted = chalk.cyan(String(value));
+                    }
+                }
+
+                this.log(`${pad}${chalk.yellow(key)}: ${formatted}`);
             }
         }
     }
@@ -82,14 +113,14 @@ export abstract class BaseConfigCommand extends Command {
                 ? chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <host>=<value>`)
                 : chalk.gray(`💡 You can set it with: git-tools ${this.commandId} config ${keyFromAllowedKey} <value>`)
             this.log(helpText);
-        } else if (typeof value === "object" && value !== null) {
-            this.log(chalk.blue(`ℹ️ Current values for "${keyFromAllowedKey}" (${typeInfo}):`));
-            const keyObj = value as UserConfig;
-            for (const [host, val] of Object.entries(keyObj)) {
-                this.log(`  ${chalk.yellow(host)}: ${chalk.green(val)}`);
-            }
+            return;
+
+        }
+
+        if (typeof value === "object" && value !== null) {
+            this.logConfiguration(value as Record<string, unknown>);
         } else {
-            this.log(chalk.blue(`ℹ️ Current value of "${keyFromAllowedKey}" (${typeInfo}): `) + chalk.green(`"${value}"`));
+            this.log(chalk.blue(`ℹ️ Current value of "${keyFromAllowedKey}": `) + chalk.green(`"${value}"`));
         }
     }
 
@@ -142,8 +173,7 @@ export abstract class BaseConfigCommand extends Command {
             const value = args.value.slice(indexOfFirstEqualSign + 1);
             let keyObj = config[keyFromAllowedKey] as undefined | UserConfig;
 
-            if(keyObj === undefined)
-            {
+            if (keyObj === undefined) {
                 config[keyFromAllowedKey] = {};
                 keyObj = config[keyFromAllowedKey] as UserConfig;
             }
@@ -181,25 +211,20 @@ export abstract class BaseConfigCommand extends Command {
         return foundKey;
     }
 
-    private convertStringToObject(path: string, value: string)
-    {
+    private convertStringToObject(path: string, value: string) {
         const keys = path.split(':');
         const dataModel = {} as Record<string, object | string>;
         let object = dataModel;
-        while (keys.length > 0)
-        {
+        while (keys.length > 0) {
             const part = keys.shift();
-            if(part === undefined) {
+            if (part === undefined) {
                 break;
             }
 
-            if (keys.length > 0 )
-            {
+            if (keys.length > 0) {
                 object[part] = {};
                 object = object[part] as Record<string, object | string>;
-            }
-            else
-            {
+            } else {
                 object[part] = value;
             }
         }
