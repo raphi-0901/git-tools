@@ -14,7 +14,8 @@ import {
 import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
-import {loadUserConfig} from "../../utils/user-config.js";
+import * as LOGGER from "../../utils/logging.js";
+import {loadGlobalUserConfig, loadLocalUserConfig, loadUserConfig, saveUserConfig} from "../../utils/user-config.js";
 
 export default class Index extends Command {
     static args = {
@@ -31,23 +32,24 @@ export default class Index extends Command {
             description: "Provide a specific instruction to the model for the commit message",
         }),
     };
+    public readonly commandId = "auto-branch";
 
     async run() {
         const {args, flags} = await this.parse(Index);
         await checkIfInGitRepository(this);
 
-        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, "auto-branch");
+        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, this.commandId);
 
         if (!URL.canParse(args.issueUrl)) {
-            this.error(chalk.red(`❌ IssueUrl was not a URL.`));
+            LOGGER.fatal(this, "IssueUrl was not a URL.");
         }
 
         const issueUrl = new URL(args.issueUrl);
         const {hostname} = issueUrl;
 
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
-        if (!userConfig.GROQ_API_KEY) {
-            this.warn(chalk.red("❌ No GROQ_API_KEY set in your config."))
+        if (!finalGroqApiKey) {
+            LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
 
             finalGroqApiKey = await input({
                 message: "Enter your GROQ API key",
@@ -58,10 +60,10 @@ export default class Index extends Command {
         let finalServiceConfigOfHostname: IssueServiceConfig | undefined;
         const allHostnamesFromConfig = userConfig.HOSTNAMES ?? {};
         if (allHostnamesFromConfig[hostname] === undefined) {
-            this.warn(chalk.red(`❌ No config found for hostname: ${hostname}`));
+            LOGGER.warn(this, `No config found for hostname: ${hostname}`);
 
             // ask for config for hostname
-            const type = await select({
+            const serviceType = await select({
                 choices: ISSUE_SERVICE_TYPES.map(type => ({
                     description: type,
                     name: type,
@@ -70,9 +72,9 @@ export default class Index extends Command {
                 message: 'Select your service type'
             });
 
-            const requiredFieldsOfService = SERVICE_DEFINITIONS[type]
+            const requiredFieldsOfService = SERVICE_DEFINITIONS[serviceType]
             const configForHostname = {
-                type,
+                type: serviceType,
             } as IssueServiceConfig
 
             for (const key of requiredFieldsOfService.requiredFields) {
@@ -93,31 +95,53 @@ export default class Index extends Command {
         } else {
             const serviceType = allHostnamesFromConfig[hostname].type as IssueServiceType;
             if (!ISSUE_SERVICE_TYPES.includes(serviceType)) {
-                this.error(chalk.red(`❌ Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${ISSUE_SERVICE_TYPES.join(", ")}`));
+                LOGGER.fatal(
+                    this,
+                    `Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${ISSUE_SERVICE_TYPES.join(", ")}`,
+                );
             }
 
             const serviceConfig = allHostnamesFromConfig[hostname]!;
             const missingFields = this.getMissingFields(serviceConfig);
 
             if (missingFields.length > 0) {
-                this.error(chalk.red(
-                    `❌ Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`
-                ));
-            }
+                LOGGER.warn(this, `Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`);
 
-            finalServiceConfigOfHostname = serviceConfig;
+                const configForHostname = {
+                    type: serviceType,
+                } as IssueServiceConfig
+
+                for (const key of missingFields) {
+                    if (key === "type") {
+                        continue;
+                    }
+
+                    // eslint-disable-next-line no-await-in-loop
+                    configForHostname[key] = await input({
+                        message: `Enter your ${key}`,
+                    });
+                }
+
+                finalServiceConfigOfHostname = configForHostname;
+                askForSavingHostnameSettings = true;
+            }
+            else {
+                finalServiceConfigOfHostname = serviceConfig;
+            }
         }
 
-        console.log('finalServiceConfigOfHostname :>>', finalServiceConfigOfHostname);
-        
-        
         const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);
+        if (!service) {
+            LOGGER.fatal(this, `Error while creating service for hostname: ${hostname}`);
+        }
+
         const issue = await service.getIssue(new URL(args.issueUrl))
         if (!issue) {
-            this.error(chalk.red(
-                "❌ No issue found for the provided ID. Check the URL or API key. " +
-                "If the issue is private, make sure to use an API key with the correct permissions."
-            ));
+            LOGGER.fatal(
+                this,
+                "No issue found for the provided ID. Check the URL or API key. " +
+                "If the issue is private, make sure to use an API key with the correct permissions.",
+            );
         }
 
         const instructions = flags.instructions ?? finalServiceConfigOfHostname.instructions;
@@ -131,7 +155,7 @@ export default class Index extends Command {
             const branchName = await chat.generate();
 
             if (!branchName) {
-                this.error(chalk.red("❌ No branch name received from Groq API"));
+                LOGGER.fatal(this, "No branch name received from Groq API");
             }
 
             finished = await this.handleUserDecision(branchName, chat);
@@ -140,7 +164,7 @@ export default class Index extends Command {
 
         if (askForSavingHostnameSettings) {
             const saveSettingsIn = await select({
-                choices: ["No", "Global", "Repository"].map(type => ({
+                choices: (["No", "Global", "Repository"] as const).map(type => ({
                     description: type,
                     name: type,
                     value: type,
@@ -148,7 +172,30 @@ export default class Index extends Command {
                 message: 'Want to save the settings for this hostname?'
             });
 
-            console.log('saveSettingsIn :>>', saveSettingsIn);
+            if (saveSettingsIn === "No") {
+                return;
+            }
+
+            const isGlobal = saveSettingsIn === "Global";
+            const userConfigForRewrite = isGlobal
+                ? await loadGlobalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
+                : await loadLocalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
+
+            if (userConfigForRewrite.HOSTNAMES === undefined) {
+                userConfigForRewrite.HOSTNAMES = {};
+            }
+
+            userConfigForRewrite.HOSTNAMES[hostname] = finalServiceConfigOfHostname;
+
+            // store groq if it was not already set
+            if (finalGroqApiKey !== userConfig.GROQ_API_KEY) {
+                userConfigForRewrite.GROQ_API_KEY = finalGroqApiKey;
+            }
+
+            await saveUserConfig(this.commandId, userConfigForRewrite, isGlobal)
+
+            LOGGER.log(this, "Successfully stored config for hostname")
+
 
         }
     }
