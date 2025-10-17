@@ -9,6 +9,12 @@ export class GitHubService implements IssueService {
     constructor(private apiKey: string) {
         this.client = new Octokit({
             auth: this.apiKey,
+            log: {
+                debug() {},
+                error() {},
+                info() {},
+                warn() {},
+            },
         });
     }
 
