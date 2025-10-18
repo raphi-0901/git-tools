@@ -4,7 +4,6 @@ import chalk from "chalk";
 import {simpleGit} from "simple-git";
 
 import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
-import {AutoBranchConfig} from "../../types/auto-branch-config.js";
 import {
     ISSUE_SERVICE_TYPES,
     IssueServiceConfig,
@@ -15,7 +14,8 @@ import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
-import {loadGlobalUserConfig, loadLocalUserConfig, loadUserConfig, saveUserConfig} from "../../utils/user-config.js";
+import {loadGlobalUserConfig, loadLocalUserConfig, loadMergedUserConfig, saveUserConfig} from "../../utils/user-config.js";
+import {AutoBranchConfig, AutoBranchConfigSchema} from "../../zod-schema/auto-branch-config.js";
 
 export default class AutoBranchCommand extends Command {
     static args = {
@@ -37,8 +37,7 @@ export default class AutoBranchCommand extends Command {
     async run() {
         const {args, flags} = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
-
-        const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, this.commandId);
+        const userConfig = await loadMergedUserConfig<Partial<AutoBranchConfig>>(this, this.commandId);
 
         if (!URL.canParse(args.issueUrl)) {
             LOGGER.fatal(this, "IssueUrl was not a URL.");

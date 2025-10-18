@@ -1,5 +1,6 @@
-import { Command } from "@oclif/core";
+import {Command} from "@oclif/core";
 import chalk from "chalk";
+import * as z from "zod";
 
 /**
  * Info logs (normal operation).
@@ -30,4 +31,15 @@ export function fatal(ctx: Command, message: string): never {
 
     ctx.log(formatted);
     return ctx.exit(1);
+}
+
+export function zodError(ctx: Command, error: z.ZodError) {
+    const message = error.issues
+        .map(
+            (issue) =>
+                `• Path: ${issue.path.join(".") || "(root)"} | Message: ${issue.message}`
+        )
+        .join("\n");
+
+    fatal(ctx, message);
 }

@@ -5,7 +5,7 @@ import { simpleGit } from "simple-git";
 
 import { AutoCommitConfig } from "../../types/auto-commit-config.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
-import { loadUserConfig } from "../../utils/user-config.js";
+import { loadMergedUserConfig } from "../../utils/user-config.js";
 
 export default class AutoCommitCommand extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
@@ -27,7 +27,7 @@ export default class AutoCommitCommand extends Command {
             return;
         }
 
-        const userConfig = await loadUserConfig<Partial<AutoCommitConfig>>(this, "auto-commit");
+        const userConfig = await loadMergedUserConfig<Partial<AutoCommitConfig>>(this, "auto-commit");
         if (!userConfig.GROQ_API_KEY) {
             this.log(chalk.yellow("⚠️ No API key found for running this command"));
             return;
