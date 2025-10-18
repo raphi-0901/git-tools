@@ -4,7 +4,7 @@ import Table from "cli-table3";
 
 import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 
-export default class List extends Command {
+export default class WipListCommand extends Command {
     static description = "List all available WIP-Snapshots.";
     static examples = [
         {

@@ -5,7 +5,7 @@ import { ResetMode, simpleGit } from "simple-git";
 
 import { generateSnapshotName } from "../../utils/generate-snapshot-name.js";
 
-export default class Index extends Command {
+export default class WipCommand extends Command {
     static args = {
         name: Args.string({
             description: "Message for identifying the WIP-snapshot. Default: WIP-Snapshot",
@@ -45,7 +45,7 @@ export default class Index extends Command {
     };
 
     async run(): Promise<void> {
-        const { args, flags } = await this.parse(Index);
+        const { args, flags } = await this.parse(WipCommand);
         const snapshotName = args.name ?? "WIP-Snapshot";
 
         await this.saveWipSnapshot(snapshotName, flags.nukeWorkingTree)

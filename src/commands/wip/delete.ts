@@ -5,7 +5,7 @@ import chalk from "chalk";
 import { deleteWipSnapshots } from "../../utils/delete-wip-snapshots.js";
 import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 
-export default class Delete extends Command {
+export default class WipDeleteCommand extends Command {
     static description = "Delete one or more WIP-Snapshots interactively.";
     static examples = [
         // Simple help
@@ -30,7 +30,7 @@ export default class Delete extends Command {
 
     async run(): Promise<void> {
         try {
-            const { flags } = await this.parse(Delete);
+            const { flags } = await this.parse(WipDeleteCommand);
             const wipSnapshots = retrieveWIPSnapshots();
 
             if (wipSnapshots.length === 0) {

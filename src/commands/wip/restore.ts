@@ -7,7 +7,7 @@ import { simpleGit } from "simple-git";
 import { generateSnapshotName } from "../../utils/generate-snapshot-name.js";
 import { retrieveWIPSnapshots } from "../../utils/retrieve-wip-snapshots.js";
 
-export default class List extends Command {
+export default class WipRestoreCommand extends Command {
     static args = {
         idOrRef: Args.string({
             description: "ID or ref of the WIP-snapshot to restore. If not provided, a list of all snapshots will be shown.",
@@ -91,7 +91,7 @@ export default class List extends Command {
     }
 
     async run(): Promise<void> {
-        const { args } = await this.parse(List);
+        const { args } = await this.parse(WipRestoreCommand);
         const ref = await this.getRefName(args.idOrRef);
         await this.restoreWipSnapshot(ref);
     }
