@@ -7,7 +7,7 @@ import { AutoCommitConfig } from "../../types/auto-commit-config.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import { loadUserConfig } from "../../utils/user-config.js";
 
-export default class Index extends Command {
+export default class AutoCommitCommand extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
         instructions: Flags.string({
@@ -17,7 +17,7 @@ export default class Index extends Command {
     };
 
     async run(): Promise<void> {
-        const { flags } = await this.parse(Index);
+        const { flags } = await this.parse(AutoCommitCommand);
 
         const git = simpleGit();
         const diff = await git.diff(["--cached"]);

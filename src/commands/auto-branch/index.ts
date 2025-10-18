@@ -17,7 +17,7 @@ import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import {loadGlobalUserConfig, loadLocalUserConfig, loadUserConfig, saveUserConfig} from "../../utils/user-config.js";
 
-export default class Index extends Command {
+export default class AutoBranchCommand extends Command {
     static args = {
         issueUrl: Args.string({
             description: "Jira issue ID to fetch",
@@ -35,7 +35,7 @@ export default class Index extends Command {
     public readonly commandId = "auto-branch";
 
     async run() {
-        const {args, flags} = await this.parse(Index);
+        const {args, flags} = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
 
         const userConfig = await loadUserConfig<Partial<AutoBranchConfig>>(this, this.commandId);
