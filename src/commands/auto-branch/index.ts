@@ -83,7 +83,6 @@ export default class AutoBranchCommand extends Command {
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                // eslint-disable-next-line no-await-in-loop
                 configForHostname[key] = await input({
                     message: `Enter your ${key}`,
                 });
@@ -115,7 +114,6 @@ export default class AutoBranchCommand extends Command {
                         continue;
                     }
 
-                    // eslint-disable-next-line no-await-in-loop
                     configForHostname[key] = await input({
                         message: `Enter your ${key}`,
                     });
@@ -149,7 +147,7 @@ export default class AutoBranchCommand extends Command {
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let finished = false;
-        /* eslint-disable no-await-in-loop */
+         
         while (!finished) {
             const branchName = await chat.generate();
 
@@ -159,7 +157,7 @@ export default class AutoBranchCommand extends Command {
 
             finished = await this.handleUserDecision(branchName, chat);
         }
-        /* eslint-enable no-await-in-loop */
+         
 
         if (askForSavingHostnameSettings) {
             const saveSettingsIn = await select({
