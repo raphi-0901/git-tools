@@ -3,6 +3,8 @@ import {Command, Flags} from "@oclif/core";
 import chalk from "chalk";
 import * as z from "zod";
 
+import {promptForValue} from "../../utils/prompt-for-value.js";
+import {selectConfigProperty} from "../../utils/select-config-property.js";
 import {selectConfigScope} from "../../utils/select-config-scope.js";
 import {getConfigFilePath, loadUserConfig, saveUserConfig} from "../../utils/user-config.js";
 import {
@@ -33,20 +35,15 @@ export default class AutoBranchConfigCommand extends Command {
         const {shape} = AutoBranchConfigSchema;
 
         // Interactive flow with inquirer
-        const selectedKey = await select({
-            choices: AutoBranchConfigKeys.map(key => ({
-                name: key,
-                value: key,
-            })),
-            message: "Which configuration key do you want to set?",
-        });
+        const selectedKey = await selectConfigProperty(AutoBranchConfigKeys)
 
         const fieldSchema = shape[selectedKey];
 
         if (fieldSchema instanceof z.ZodString) {
-            const value = await input({
-                default: config[selectedKey] as string | undefined,
-                message: `Enter a value for "${selectedKey}" (leave empty to unset):`,
+            const value = await promptForValue({
+                currentValue: config[selectedKey],
+                key: selectedKey,
+                schema: fieldSchema,
             });
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -113,21 +110,13 @@ export default class AutoBranchConfigCommand extends Command {
                         continue
                     }
 
-                    // eslint-disable-next-line no-await-in-loop
-                    const answerForKey = await input({
+                    const answerForKey = await promptForValue({
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-expect-error
-                        default: configAtCurrentKey[hostname]?.[key] as string | undefined,
-                        message: `Enter ${key}:`,
-                        validate(value) {
-                            const parsed = fieldSchema.safeParse(value);
-                            if (parsed.success) {
-                                return true
-                            }
-
-                            return parsed.error.issues[0].message;
-                        },
-                    });
+                        currentValue: configAtCurrentKey[hostname]?.[key],
+                        key,
+                        schema: fieldSchema,
+                    })
 
                     if (answerForKey === "") {
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

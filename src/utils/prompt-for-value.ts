@@ -1,0 +1,27 @@
+import {input} from "@inquirer/prompts";
+import * as z from "zod";
+
+export async function promptForValue<T>({
+                                     currentValue,
+                                     customMessage,
+                                     key,
+                                     schema
+                                 }: {
+    currentValue?: T;
+    customMessage?: string;
+    key: string;
+    schema: z.ZodSchema<T>;
+}) {
+    return input({
+        default: currentValue as string | undefined,
+        message: customMessage || `Enter a value for "${key}" (leave empty to unset):`,
+        validate(value) {
+            const parsed = schema.safeParse(value);
+            if (parsed.success) {
+                return true;
+            }
+
+            return parsed.error.issues[0].message;
+        }
+    });
+}
