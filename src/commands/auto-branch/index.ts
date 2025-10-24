@@ -15,7 +15,7 @@ import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js"
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import {loadGlobalUserConfig, loadLocalUserConfig, loadMergedUserConfig, saveUserConfig} from "../../utils/user-config.js";
-import {AutoBranchConfig, AutoBranchConfigSchema} from "../../zod-schema/auto-branch-config.js";
+import {AutoBranchConfig, AutoBranchUpdateConfig} from "../../zod-schema/auto-branch-config.js";
 
 export default class AutoBranchCommand extends Command {
     static args = {
@@ -37,7 +37,7 @@ export default class AutoBranchCommand extends Command {
     async run() {
         const {args, flags} = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
-        const userConfig = await loadMergedUserConfig<Partial<AutoBranchConfig>>(this, this.commandId);
+        const userConfig = await loadMergedUserConfig<AutoBranchUpdateConfig>(this, this.commandId);
 
         if (!URL.canParse(args.issueUrl)) {
             LOGGER.fatal(this, "IssueUrl was not a URL.");
@@ -147,7 +147,7 @@ export default class AutoBranchCommand extends Command {
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let finished = false;
-         
+
         while (!finished) {
             const branchName = await chat.generate();
 
@@ -157,7 +157,7 @@ export default class AutoBranchCommand extends Command {
 
             finished = await this.handleUserDecision(branchName, chat);
         }
-         
+
 
         if (askForSavingHostnameSettings) {
             const saveSettingsIn = await select({

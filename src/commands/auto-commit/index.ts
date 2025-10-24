@@ -3,9 +3,9 @@ import { Command, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
-import { AutoCommitConfig } from "../../types/auto-commit-config.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import { loadMergedUserConfig } from "../../utils/user-config.js";
+import {AutoCommitUpdateConfig} from "../../zod-schema/auto-commit-config.js";
 
 export default class AutoCommitCommand extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
@@ -27,7 +27,7 @@ export default class AutoCommitCommand extends Command {
             return;
         }
 
-        const userConfig = await loadMergedUserConfig<Partial<AutoCommitConfig>>(this, "auto-commit");
+        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this, "auto-commit");
         if (!userConfig.GROQ_API_KEY) {
             this.log(chalk.yellow("⚠️ No API key found for running this command"));
             return;
@@ -61,7 +61,7 @@ ${diff}
         let finished = false;
         let commitMessage = "";
 
-        /* eslint-disable no-await-in-loop */
+
         while (!finished) {
             commitMessage = await chat.generate();
 
@@ -117,6 +117,6 @@ ${diff}
                 }
             }
         }
-        /* eslint-enable no-await-in-loop */
+
     }
 }
