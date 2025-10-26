@@ -7,6 +7,7 @@ import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
 import {ISSUE_SERVICE_TYPES, IssueServiceConfig, IssueServiceType} from "../../types/issue-service-type.js";
 import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
+import {createSpinner} from "../../utils/create-spinner.js";
 import {gatherAutoBranchConfigForHostname} from "../../utils/gather-auto-branch-config.js";
 import {getSchemaForUnionOfAutoBranch} from "../../utils/get-schema-for-union-of-auto-branch.js";
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
@@ -110,6 +111,10 @@ export default class AutoBranchCommand extends Command {
             LOGGER.fatal(this, `No service config found for hostname: ${hostname}`);
         }
 
+        const spinner = createSpinner({
+            text: "Analyzing issue for branch name generation...",
+        }).start();
+
         const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);
         if (!service) {
             LOGGER.fatal(this, `Error while creating service for hostname: ${hostname}`);
@@ -132,7 +137,10 @@ export default class AutoBranchCommand extends Command {
         let finished = false;
 
         while (!finished) {
+            spinner.text = "Generating branch name from issue...";
+            spinner.start()
             const branchName = await chat.generate();
+            spinner.stop()
 
             if (!branchName) {
                 LOGGER.fatal(this, "No branch name received from Groq API");
