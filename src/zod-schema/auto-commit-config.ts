@@ -5,10 +5,7 @@ export const AutoCommitConfigSchema = z.strictObject({
     INSTRUCTIONS: z.string(),
 });
 
-export const AutoCommitUpdateConfigSchema = z.strictObject({
-    GROQ_API_KEY: z.string(),
-    INSTRUCTIONS: z.string(),
-}).partial();
+export const AutoCommitUpdateConfigSchema = AutoCommitConfigSchema.partial();
 
 export type AutoCommitConfig = z.infer<typeof AutoCommitConfigSchema>;
 export type AutoCommitUpdateConfig = z.infer<typeof AutoCommitUpdateConfigSchema>;
