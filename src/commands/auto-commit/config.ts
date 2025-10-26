@@ -29,23 +29,10 @@ export default class AutoCommitConfigCommand extends Command {
         const selectedKey = await selectConfigProperty(AutoCommitConfigKeys)
         const fieldSchema = shape[selectedKey];
 
-        const value1 = await promptForValue({
+        const value = await promptForValue({
             currentValue: config[selectedKey],
             key: selectedKey,
             schema: fieldSchema,
-        });
-
-        const value = await input({
-            default: config[selectedKey] as string | undefined,
-            message: `Enter a value for "${selectedKey}" (leave empty to unset):`,
-            validate(value) {
-                const parsed = fieldSchema.safeParse(value);
-                if (parsed.success) {
-                    return true
-                }
-
-                return parsed.error.issues[0].message;
-            }
         });
 
         config[selectedKey] = value === "" ? undefined : value
