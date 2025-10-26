@@ -13,6 +13,7 @@ import {getSchemaForUnionOfAutoBranch} from "../../utils/get-schema-for-union-of
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import {promptForValue} from "../../utils/prompt-for-value.js";
+import {saveGatheredSettings} from "../../utils/save-gathered-settings.js";
 import {
     loadGlobalUserConfig,
     loadLocalUserConfig,
@@ -149,42 +150,16 @@ export default class AutoBranchCommand extends Command {
             finished = await this.handleUserDecision(branchName, chat);
         }
 
-        if (!askForSavingHostnameSettings) {
+        if (!askForSavingSettings) {
             return;
         }
 
-        const saveSettingsIn = await select({
-            choices: (["No", "Global", "Repository"] as const).map(type => ({
-                description: type,
-                name: type,
-                value: type,
-            })),
-            message: 'Want to save the settings for this hostname?'
-        });
-
-        if (saveSettingsIn === "No") {
-            return;
-        }
-
-        const isGlobal = saveSettingsIn === "Global";
-        const userConfigForRewrite = isGlobal
-            ? await loadGlobalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
-            : await loadLocalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
-
-        if (userConfigForRewrite.HOSTNAMES === undefined) {
-            userConfigForRewrite.HOSTNAMES = {};
-        }
-
-        userConfigForRewrite.HOSTNAMES[hostname] = finalServiceConfigOfHostname;
-
-        // store groq if it was not already set
-        if (finalGroqApiKey !== userConfig.GROQ_API_KEY) {
-            userConfigForRewrite.GROQ_API_KEY = finalGroqApiKey;
-        }
-
-        await saveUserConfig(this.commandId, userConfigForRewrite, isGlobal)
-
-        LOGGER.log(this, "Successfully stored config for hostname")
+        await saveGatheredSettings(this, this.commandId, {
+            GROQ_API_KEY: finalGroqApiKey,
+            HOSTNAMES: {
+                [hostname]: finalServiceConfigOfHostname,
+            }
+        })
     }
 
     private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {
