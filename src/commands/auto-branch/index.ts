@@ -42,6 +42,10 @@ export default class AutoBranchCommand extends Command {
     };
     public readonly commandId = "auto-branch";
 
+    async catch() {
+        this.log(chalk.red("🚫 Branch creation cancelled."));
+    }
+
     async run() {
         const {args, flags} = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);

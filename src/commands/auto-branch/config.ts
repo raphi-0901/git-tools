@@ -21,6 +21,10 @@ export default class AutoBranchConfigCommand extends Command {
     };
     public readonly commandId = "auto-branch"
 
+    async catch() {
+        this.log(chalk.red("🚫 Cancelled."));
+    }
+
     async run(): Promise<void> {
         const {flags} = await this.parse(AutoBranchConfigCommand);
         const loadGlobalPath = flags.global || await selectConfigScope() === "global";

@@ -16,6 +16,10 @@ export default class AutoCommitCommand extends Command {
         }),
     };
 
+    async catch() {
+        this.log(chalk.red("🚫 Commit cancelled."));
+    }
+
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
 

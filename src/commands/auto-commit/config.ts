@@ -18,6 +18,10 @@ export default class AutoCommitConfigCommand extends Command {
     };
     public readonly commandId = "auto-commit"
 
+    async catch() {
+        this.log(chalk.red("🚫 Cancelled."));
+    }
+
     async run(): Promise<void> {
         const {flags} = await this.parse(AutoCommitConfigCommand);
         const {shape} = AutoCommitConfigSchema;
