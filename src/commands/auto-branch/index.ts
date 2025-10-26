@@ -4,18 +4,26 @@ import chalk from "chalk";
 import {simpleGit} from "simple-git";
 
 import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
-import {
-    ISSUE_SERVICE_TYPES,
-    IssueServiceConfig,
-    IssueServiceType,
-    SERVICE_DEFINITIONS
-} from "../../types/issue-service-type.js";
+import {ISSUE_SERVICE_TYPES, IssueServiceConfig, IssueServiceType} from "../../types/issue-service-type.js";
 import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
+import {gatherAutoBranchConfigForHostname} from "../../utils/gather-auto-branch-config.js";
+import {getSchemaForUnionOfAutoBranch} from "../../utils/get-schema-for-union-of-auto-branch.js";
 import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
-import {loadGlobalUserConfig, loadLocalUserConfig, loadMergedUserConfig, saveUserConfig} from "../../utils/user-config.js";
-import {AutoBranchConfig, AutoBranchUpdateConfig} from "../../zod-schema/auto-branch-config.js";
+import {promptForValue} from "../../utils/prompt-for-value.js";
+import {
+    loadGlobalUserConfig,
+    loadLocalUserConfig,
+    loadMergedUserConfig,
+    saveUserConfig
+} from "../../utils/user-config.js";
+import {
+    AutoBranchConfig,
+    AutoBranchConfigSchema,
+    AutoBranchServiceConfig,
+    AutoBranchUpdateConfig
+} from "../../zod-schema/auto-branch-config.js";
 
 export default class AutoBranchCommand extends Command {
     static args = {
@@ -46,50 +54,25 @@ export default class AutoBranchCommand extends Command {
         const issueUrl = new URL(args.issueUrl);
         const {hostname} = issueUrl;
 
+        const {shape} = AutoBranchConfigSchema;
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
 
-            finalGroqApiKey = await input({
-                message: "Enter your GROQ API key",
-            });
+            finalGroqApiKey = await promptForValue({key: 'GROQ_API_KEY', schema: shape.GROQ_API_KEY})
         }
 
         let askForSavingHostnameSettings = false;
-        let finalServiceConfigOfHostname: IssueServiceConfig | undefined;
+        let finalServiceConfigOfHostname: AutoBranchServiceConfig | undefined;
         const allHostnamesFromConfig = userConfig.HOSTNAMES ?? {};
         if (allHostnamesFromConfig[hostname] === undefined) {
             LOGGER.warn(this, `No config found for hostname: ${hostname}`);
-
-            // ask for config for hostname
-            const serviceType = await select({
-                choices: ISSUE_SERVICE_TYPES.map(type => ({
-                    description: type,
-                    name: type,
-                    value: type,
-                })),
-                message: 'Select your service type'
-            });
-
-            const requiredFieldsOfService = SERVICE_DEFINITIONS[serviceType]
-            const configForHostname = {
-                type: serviceType,
-            } as IssueServiceConfig
-
-            for (const key of requiredFieldsOfService.requiredFields) {
-                if (key === "type") {
-                    continue;
-                }
-
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                configForHostname[key] = await input({
-                    message: `Enter your ${key}`,
-                });
-            }
-
-            finalServiceConfigOfHostname = configForHostname;
             askForSavingHostnameSettings = true;
+            finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
+            if (!finalServiceConfigOfHostname) {
+                // should never happen
+                LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
+            }
         } else {
             const serviceType = allHostnamesFromConfig[hostname].type as IssueServiceType;
             if (!ISSUE_SERVICE_TYPES.includes(serviceType)) {
@@ -100,31 +83,27 @@ export default class AutoBranchCommand extends Command {
             }
 
             const serviceConfig = allHostnamesFromConfig[hostname]!;
-            const missingFields = this.getMissingFields(serviceConfig);
+            const schemaForType = getSchemaForUnionOfAutoBranch(serviceType)!;
 
-            if (missingFields.length > 0) {
-                LOGGER.warn(this, `Some required config missing for hostname: ${hostname}\nMissing fields: ${missingFields.join(", ")}`);
+            // validate against schema
+            const isSafe = schemaForType.safeParse(serviceConfig)
+            console.log('isSafe :>>', isSafe);
 
-                const configForHostname = {
-                    type: serviceType,
-                } as IssueServiceConfig
-
-                for (const key of missingFields) {
-                    if (key === "type") {
-                        continue;
-                    }
-
-                    configForHostname[key] = await input({
-                        message: `Enter your ${key}`,
-                    });
-                }
-
-                finalServiceConfigOfHostname = configForHostname;
+            if (isSafe.success) {
+                finalServiceConfigOfHostname = isSafe.data;
+            } else {
                 askForSavingHostnameSettings = true;
+                finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
+                if (!finalServiceConfigOfHostname) {
+                    // should never happen
+                    LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
+                }
             }
-            else {
-                finalServiceConfigOfHostname = serviceConfig;
-            }
+        }
+
+        if (!finalServiceConfigOfHostname) {
+            // should never happen
+            LOGGER.fatal(this, `No service config found for hostname: ${hostname}`);
         }
 
         const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);
@@ -158,43 +137,42 @@ export default class AutoBranchCommand extends Command {
             finished = await this.handleUserDecision(branchName, chat);
         }
 
-
-        if (askForSavingHostnameSettings) {
-            const saveSettingsIn = await select({
-                choices: (["No", "Global", "Repository"] as const).map(type => ({
-                    description: type,
-                    name: type,
-                    value: type,
-                })),
-                message: 'Want to save the settings for this hostname?'
-            });
-
-            if (saveSettingsIn === "No") {
-                return;
-            }
-
-            const isGlobal = saveSettingsIn === "Global";
-            const userConfigForRewrite = isGlobal
-                ? await loadGlobalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
-                : await loadLocalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
-
-            if (userConfigForRewrite.HOSTNAMES === undefined) {
-                userConfigForRewrite.HOSTNAMES = {};
-            }
-
-            userConfigForRewrite.HOSTNAMES[hostname] = finalServiceConfigOfHostname;
-
-            // store groq if it was not already set
-            if (finalGroqApiKey !== userConfig.GROQ_API_KEY) {
-                userConfigForRewrite.GROQ_API_KEY = finalGroqApiKey;
-            }
-
-            await saveUserConfig(this.commandId, userConfigForRewrite, isGlobal)
-
-            LOGGER.log(this, "Successfully stored config for hostname")
-
-
+        if (!askForSavingHostnameSettings) {
+            return;
         }
+
+        const saveSettingsIn = await select({
+            choices: (["No", "Global", "Repository"] as const).map(type => ({
+                description: type,
+                name: type,
+                value: type,
+            })),
+            message: 'Want to save the settings for this hostname?'
+        });
+
+        if (saveSettingsIn === "No") {
+            return;
+        }
+
+        const isGlobal = saveSettingsIn === "Global";
+        const userConfigForRewrite = isGlobal
+            ? await loadGlobalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
+            : await loadLocalUserConfig<Partial<AutoBranchConfig>>(this, this.commandId)
+
+        if (userConfigForRewrite.HOSTNAMES === undefined) {
+            userConfigForRewrite.HOSTNAMES = {};
+        }
+
+        userConfigForRewrite.HOSTNAMES[hostname] = finalServiceConfigOfHostname;
+
+        // store groq if it was not already set
+        if (finalGroqApiKey !== userConfig.GROQ_API_KEY) {
+            userConfigForRewrite.GROQ_API_KEY = finalGroqApiKey;
+        }
+
+        await saveUserConfig(this.commandId, userConfigForRewrite, isGlobal)
+
+        LOGGER.log(this, "Successfully stored config for hostname")
     }
 
     private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {

@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {UserConfig} from "../types/user-config.js";
+import * as LOGGER from "../utils/logging.js";
 import {createEmptyConfigFile} from "./create-empty-config-file.js";
 import {getRepositoryRootPath} from "./get-repository-root-path.js";
 
@@ -48,11 +49,10 @@ export async function readConfig<T>(ctx: Command, configPath: string): Promise<T
         try {
             return await fs.readJSON(configPath) as T;
         } catch (error) {
-            ctx.warn(`Error reading config: ${error}. Using defaults.`);
-            await createEmptyConfigFile(configPath);
+            LOGGER.fatal(ctx, `Error reading config: ${error}.`);
         }
     } else {
-        ctx.log("Config not found. Creating a new one with defaults.");
+        LOGGER.log(ctx, "Config not found. Creating a new one with defaults.");
         await createEmptyConfigFile(configPath);
     }
 
