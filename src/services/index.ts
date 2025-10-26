@@ -1,15 +1,11 @@
-import {IssueServiceConfig, IssueServiceType, SERVICE_DEFINITIONS} from "../types/issue-service-type.js";
+import {AutoBranchServiceConfig, AutoBranchServiceTypesConfig} from "../zod-schema/auto-branch-config.js";
 import {GitHubService} from "./github-service.js";
 import {GitLabService} from "./gitlab-service.js";
 import {IssueService} from "./issue-service.js";
 import {JiraV2PatService} from "./jira-v2-pat-service.js";
 import {JiraV2Service} from "./jira-v2-service.js";
 
-export const REQUIRED_FIELDS_BY_TYPE = Object.fromEntries(
-    Object.entries(SERVICE_DEFINITIONS).map(([key, val]) => [key, [...val.requiredFields]])
-);
-
-export function getService(type: IssueServiceType, config: IssueServiceConfig): IssueService | null {
+export function getService(type: AutoBranchServiceTypesConfig, config: AutoBranchServiceConfig): IssueService | null {
     switch (type) {
         case "github": {
             if (config.type !== "github") {

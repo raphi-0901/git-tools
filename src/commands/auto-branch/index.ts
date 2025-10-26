@@ -3,8 +3,7 @@ import {Args, Command, Flags} from "@oclif/core";
 import chalk from "chalk";
 import {simpleGit} from "simple-git";
 
-import {getService, REQUIRED_FIELDS_BY_TYPE} from "../../services/index.js";
-import {ISSUE_SERVICE_TYPES, IssueServiceConfig, IssueServiceType} from "../../types/issue-service-type.js";
+import {getService} from "../../services/index.js";
 import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
 import {createSpinner} from "../../utils/create-spinner.js";
@@ -14,16 +13,10 @@ import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import {promptForValue} from "../../utils/prompt-for-value.js";
 import {saveGatheredSettings} from "../../utils/save-gathered-settings.js";
+import {loadMergedUserConfig} from "../../utils/user-config.js";
 import {
-    loadGlobalUserConfig,
-    loadLocalUserConfig,
-    loadMergedUserConfig,
-    saveUserConfig
-} from "../../utils/user-config.js";
-import {
-    AutoBranchConfig,
     AutoBranchConfigSchema,
-    AutoBranchServiceConfig,
+    AutoBranchServiceConfig, AutoBranchServiceTypeValues,
     AutoBranchUpdateConfig
 } from "../../zod-schema/auto-branch-config.js";
 
