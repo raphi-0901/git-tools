@@ -1,4 +1,4 @@
-import {Command} from "@oclif/core";
+import { Command } from "@oclif/core";
 import isOnlineFn from 'is-online';
 
 import * as LOGGER from "./logging.js";

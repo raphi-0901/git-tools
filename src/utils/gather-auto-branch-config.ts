@@ -4,11 +4,11 @@ import {
     AutoBranchServiceConfig,
     AutoBranchServiceTypeValues
 } from "../zod-schema/auto-branch-config.js";
-import {getSchemaForUnionOfAutoBranch} from "./get-schema-for-union-of-auto-branch.js";
-import {promptForValue} from "./prompt-for-value.js";
+import { getSchemaForUnionOfAutoBranch } from "./get-schema-for-union-of-auto-branch.js";
+import { promptForValue } from "./prompt-for-value.js";
 
 export async function gatherAutoBranchConfigForHostname(allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
-    let newConfig: Partial<AutoBranchServiceConfig> = {...currentConfig};
+    let newConfig: Partial<AutoBranchServiceConfig> = { ...currentConfig };
     const baseServiceChoices = AutoBranchServiceTypeValues.map((type) => ({
         name: type,
         value: type,
@@ -16,7 +16,7 @@ export async function gatherAutoBranchConfigForHostname(allHostnames: string[], 
 
     const deleteChoice =
         allHostnames.includes(hostnameToAdd)
-            ? {name: "delete", value: "delete"} as const
+            ? { name: "delete", value: "delete" } as const
             : null;
 
     const serviceType = await select({

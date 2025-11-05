@@ -1,6 +1,6 @@
-import {execSync} from "node:child_process";
+import { execSync } from "node:child_process";
 
-import {WIPSnapshot} from "../types/wip-snapshot.js";
+import { WIPSnapshot } from "../types/wip-snapshot.js";
 
 export function retrieveWIPSnapshots(): WIPSnapshot[] {
     // read all refs under refs/wip/**

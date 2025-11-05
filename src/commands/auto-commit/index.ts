@@ -3,9 +3,9 @@ import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
-import {FATAL_ERROR_NUMBER} from "../../utils/constants.js";
-import {createSpinner} from "../../utils/create-spinner.js";
-import {isOnline} from "../../utils/is-online.js";
+import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
+import { createSpinner } from "../../utils/create-spinner.js";
+import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";

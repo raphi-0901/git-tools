@@ -1,4 +1,4 @@
-import {input} from "@inquirer/prompts";
+import { input } from "@inquirer/prompts";
 import * as z from "zod";
 
 export async function promptForValue<T>({

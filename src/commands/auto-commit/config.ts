@@ -1,10 +1,10 @@
-import {Command, Flags} from "@oclif/core";
+import { Command, Flags } from "@oclif/core";
 import chalk from "chalk";
 
-import {promptForValue} from "../../utils/prompt-for-value.js";
-import {selectConfigProperty} from "../../utils/select-config-property.js";
-import {selectConfigScope} from "../../utils/select-config-scope.js";
-import {getConfigFilePath, loadUserConfig, saveUserConfig} from "../../utils/user-config.js";
+import { promptForValue } from "../../utils/prompt-for-value.js";
+import { selectConfigProperty } from "../../utils/select-config-property.js";
+import { selectConfigScope } from "../../utils/select-config-scope.js";
+import { getConfigFilePath, loadUserConfig, saveUserConfig } from "../../utils/user-config.js";
 import {
     AutoCommitConfigKeys,
     AutoCommitConfigSchema,
@@ -13,7 +13,7 @@ import {
 
 export default class AutoCommitConfigCommand extends Command {
     static flags = {
-        global: Flags.boolean({description: "Set configuration globally"}),
+        global: Flags.boolean({ description: "Set configuration globally" }),
     };
     public readonly commandId = "auto-commit"
 
@@ -22,8 +22,8 @@ export default class AutoCommitConfigCommand extends Command {
     }
 
     async run(): Promise<void> {
-        const {flags} = await this.parse(AutoCommitConfigCommand);
-        const {shape} = AutoCommitConfigSchema;
+        const { flags } = await this.parse(AutoCommitConfigCommand);
+        const { shape } = AutoCommitConfigSchema;
 
         const loadGlobalPath = flags.global || await selectConfigScope() === "global";
         const configPath = await getConfigFilePath(this.commandId, loadGlobalPath);

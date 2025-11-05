@@ -1,6 +1,6 @@
 import type { Options } from "yocto-spinner";
 
-import {deepmerge} from "deepmerge-ts";
+import { deepmerge } from "deepmerge-ts";
 import yoctoSpinner from "yocto-spinner";
 
 export function createSpinner(options: Options) {

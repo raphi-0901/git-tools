@@ -1,9 +1,9 @@
-import {select} from "@inquirer/prompts";
-import {Command} from "@oclif/core";
-import {deepmerge} from "deepmerge-ts";
+import { select } from "@inquirer/prompts";
+import { Command } from "@oclif/core";
+import { deepmerge } from "deepmerge-ts";
 
 import * as LOGGER from "./logging.js";
-import {loadGlobalUserConfig, loadLocalUserConfig, saveUserConfig} from "./user-config.js";
+import { loadGlobalUserConfig, loadLocalUserConfig, saveUserConfig } from "./user-config.js";
 
 export async function saveGatheredSettings<T>(ctx: Command, commandId: string, configForOverwrite: Partial<T>) {
     const saveSettingsIn = await select({

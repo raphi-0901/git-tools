@@ -1,4 +1,4 @@
-import {select} from "@inquirer/prompts";
+import { select } from "@inquirer/prompts";
 
 export async function selectConfigProperty<T extends string>(
     options: readonly T[]

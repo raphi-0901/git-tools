@@ -1,14 +1,14 @@
-import {Command} from "@oclif/core";
+import { Command } from "@oclif/core";
 import chalk from "chalk";
-import {deepmerge} from "deepmerge-ts";
+import { deepmerge } from "deepmerge-ts";
 import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
 
-import {UserConfig} from "../types/user-config.js";
+import { UserConfig } from "../types/user-config.js";
 import * as LOGGER from "../utils/logging.js";
-import {createEmptyConfigFile} from "./create-empty-config-file.js";
-import {getRepositoryRootPath} from "./get-repository-root-path.js";
+import { createEmptyConfigFile } from "./create-empty-config-file.js";
+import { getRepositoryRootPath } from "./get-repository-root-path.js";
 
 export async function loadMergedUserConfig<T>(ctx: Command, commandId: string): Promise<T> {
     const globalConfig = await loadGlobalUserConfig<T>(ctx, commandId)

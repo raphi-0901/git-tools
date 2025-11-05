@@ -1,7 +1,7 @@
-import {Version2Client} from "jira.js";
+import { Version2Client } from "jira.js";
 
-import {IssueSummary} from "../types/issue-summary.js";
-import {IssueService} from "./issue-service.js";
+import { IssueSummary } from "../types/issue-summary.js";
+import { IssueService } from "./issue-service.js";
 
 export class JiraV2Service implements IssueService {
     constructor(private apiKey: string, private email: string) {}

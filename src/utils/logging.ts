@@ -1,8 +1,8 @@
-import {Command} from "@oclif/core";
+import { Command } from "@oclif/core";
 import chalk from "chalk";
 import * as z from "zod";
 
-import {FATAL_ERROR_NUMBER} from "./constants.js";
+import { FATAL_ERROR_NUMBER } from "./constants.js";
 
 /**
  * Info logs (normal operation).

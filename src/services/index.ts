@@ -1,9 +1,9 @@
-import {AutoBranchServiceConfig, AutoBranchServiceTypesConfig} from "../zod-schema/auto-branch-config.js";
-import {GitHubService} from "./github-service.js";
-import {GitLabService} from "./gitlab-service.js";
-import {IssueService} from "./issue-service.js";
-import {JiraV2PatService} from "./jira-v2-pat-service.js";
-import {JiraV2Service} from "./jira-v2-service.js";
+import { AutoBranchServiceConfig, AutoBranchServiceTypesConfig } from "../zod-schema/auto-branch-config.js";
+import { GitHubService } from "./github-service.js";
+import { GitLabService } from "./gitlab-service.js";
+import { IssueService } from "./issue-service.js";
+import { JiraV2PatService } from "./jira-v2-pat-service.js";
+import { JiraV2Service } from "./jira-v2-service.js";
 
 export function getService(type: AutoBranchServiceTypesConfig, config: AutoBranchServiceConfig): IssueService | null {
     switch (type) {

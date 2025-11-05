@@ -1,20 +1,20 @@
-import {input, select} from "@inquirer/prompts";
-import {Args, Command, Errors, Flags} from "@oclif/core";
+import { input, select } from "@inquirer/prompts";
+import { Args, Command, Errors, Flags } from "@oclif/core";
 import chalk from "chalk";
-import {simpleGit} from "simple-git";
+import { simpleGit } from "simple-git";
 
-import {getService} from "../../services/index.js";
-import {IssueSummary} from "../../types/issue-summary.js";
-import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
-import {FATAL_ERROR_NUMBER} from "../../utils/constants.js";
-import {createSpinner} from "../../utils/create-spinner.js";
-import {gatherAutoBranchConfigForHostname} from "../../utils/gather-auto-branch-config.js";
-import {getSchemaForUnionOfAutoBranch} from "../../utils/get-schema-for-union-of-auto-branch.js";
-import {ChatMessage, LLMChat} from "../../utils/llm-chat.js";
+import { getService } from "../../services/index.js";
+import { IssueSummary } from "../../types/issue-summary.js";
+import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
+import { createSpinner } from "../../utils/create-spinner.js";
+import { gatherAutoBranchConfigForHostname } from "../../utils/gather-auto-branch-config.js";
+import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
+import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
-import {promptForValue} from "../../utils/prompt-for-value.js";
-import {saveGatheredSettings} from "../../utils/save-gathered-settings.js";
-import {loadMergedUserConfig} from "../../utils/user-config.js";
+import { promptForValue } from "../../utils/prompt-for-value.js";
+import { saveGatheredSettings } from "../../utils/save-gathered-settings.js";
+import { loadMergedUserConfig } from "../../utils/user-config.js";
 import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
@@ -48,7 +48,7 @@ export default class AutoBranchCommand extends Command {
     }
 
     async run() {
-        const {args, flags} = await this.parse(AutoBranchCommand);
+        const { args, flags } = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
 
         if (!URL.canParse(args.issueUrl)) {
@@ -134,7 +134,7 @@ Ticket Description: "${issue.description}"
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForValue({key: 'GROQ_API_KEY', schema: AutoBranchConfigSchema.shape.GROQ_API_KEY})
+            finalGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoBranchConfigSchema.shape.GROQ_API_KEY })
             askForSavingSettings = true;
         }
 
@@ -193,10 +193,10 @@ Ticket Description: "${issue.description}"
 
         const decision = await select({
             choices: [
-                {name: "✅ Accept and create branch", value: "accept"},
-                {name: "✍️ Edit manually", value: "edit"},
-                {name: "🔁 Provide feedback", value: "feedback"},
-                {name: "❌ Cancel", value: "cancel"},
+                { name: "✅ Accept and create branch", value: "accept" },
+                { name: "✍️ Edit manually", value: "edit" },
+                { name: "🔁 Provide feedback", value: "feedback" },
+                { name: "❌ Cancel", value: "cancel" },
             ] as const,
             message: "What would you like to do?",
         });
@@ -214,14 +214,14 @@ Ticket Description: "${issue.description}"
             }
 
             case "edit": {
-                const userEdit = await input({default: branchName, message: "Enter your custom branch name:"});
+                const userEdit = await input({ default: branchName, message: "Enter your custom branch name:" });
                 await git.checkoutLocalBranch(userEdit);
                 this.log(chalk.green("✅ Branch created with custom name!"));
                 return true;
             }
 
             case "feedback": {
-                const feedback = await input({message: "Provide your feedback for the LLM:"});
+                const feedback = await input({ message: "Provide your feedback for the LLM:" });
                 chat.addMessage(feedback, "user");
                 return false;
             }

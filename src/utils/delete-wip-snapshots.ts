@@ -1,6 +1,6 @@
-import {Command} from "@oclif/core";
+import { Command } from "@oclif/core";
 import chalk from "chalk";
-import {execSync} from "node:child_process";
+import { execSync } from "node:child_process";
 
 export function deleteWipSnapshots(ctx: Command, refs: string[]): void {
     try {
