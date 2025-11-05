@@ -5,6 +5,7 @@ import { simpleGit } from "simple-git";
 
 import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
+import { estimateTokens } from "../../utils/estimate-token.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -68,8 +69,15 @@ export default class AutoCommitCommand extends Command {
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
         const diff = await this.getDiff();
+
         if(diff.trim().length === 0) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
+        }
+
+        const tokens = await estimateTokens(diff);
+        console.log('token :>>', tokens);
+        if(tokens > 9000) {
+            LOGGER.fatal(this, "The diff is too long. Please split it into smaller chunks.");
         }
 
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
