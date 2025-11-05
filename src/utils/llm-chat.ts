@@ -1,5 +1,7 @@
 import * as OpenAI from "openai";
 
+import { STANDARD_LLM_MODEL } from "./constants.js";
+
 export type ChatMessage = OpenAI.OpenAI.Chat.ChatCompletionMessageParam;
 
 export class LLMChat {
@@ -21,7 +23,7 @@ export class LLMChat {
     /**
      * Generate a completion from the current chat history.
      */
-    async generate(model = "openai/gpt-oss-120b", temperature = 0.4): Promise<string> {
+    async generate(model = STANDARD_LLM_MODEL, temperature = 0.4): Promise<string> {
         const response = await this.client.chat.completions.create({
             messages: this.messages,
             model,
