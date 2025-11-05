@@ -5,7 +5,6 @@ import { simpleGit } from "simple-git";
 
 import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
-import { estimateTokens } from "../../utils/estimate-token.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -23,6 +22,10 @@ export default class AutoCommitCommand extends Command {
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
         }),
+        stripDiff: Flags.boolean({
+            char: "s",
+            description: "Strips diffs.",
+        }),
     };
     public readonly commandId = "auto-commit";
 
@@ -35,7 +38,7 @@ export default class AutoCommitCommand extends Command {
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
-    async getDiff() {
+    async getDiff(stripDiff: boolean) {
         const git = simpleGit();
 
         const stagedFiles = (await git.diff(["--cached", "--name-only"]))
@@ -63,22 +66,27 @@ export default class AutoCommitCommand extends Command {
             ]
         );
 
-        return diffs.join("\n");
+        return stripDiff
+            ? this.filterDiffForLLM(diffs.join("\n"))
+            : diffs.join("\n")
     }
 
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
-        const diff = await this.getDiff();
+        const diff = await this.getDiff(flags.stripDiff);
 
         if(diff.trim().length === 0) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
-        const tokens = await estimateTokens(diff);
-        console.log('token :>>', tokens);
-        if(tokens > 9000) {
-            LOGGER.fatal(this, "The diff is too long. Please split it into smaller chunks.");
-        }
+        console.log(diff);
+
+
+        // const tokens = await estimateTokens(diff);
+        // console.log('token :>>', tokens);
+        // if(tokens > 9000) {
+        //     LOGGER.fatal(this, "The diff is too long. Please split it into smaller chunks.");
+        // }
 
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
         await isOnline(this)
@@ -158,6 +166,84 @@ ${diff}
             },
         ] as ChatMessage[];
     }
+
+    /**
+     * Filters out nonessential lines from a git diff to save LLM tokens.
+     * Keeps only actual content changes (+/-), file names, and headers.
+     */
+    /**
+     * Filters a git diff for LLM input:
+     * - Keeps added/removed lines and a few context lines around them
+     * - Removes index, position, and binary noise
+     */
+    /**
+     * Filters a git diff for LLM input:
+     * - Keeps changed lines (+/-) and a few neutral context lines
+     * - Removes @@, index, and binary/metadata lines
+     * - Keeps file headers (diff --git)
+     */
+    /**
+     * Filters a git diff for LLM input:
+     * - Keeps changed lines (+/-) and limited context
+     * - Keeps @@ lines but strips the position info (only keeps trailing context)
+     * - Removes index, binary, and other metadata lines
+     * - Keeps file headers (diff --git)
+     */
+    private filterDiffForLLM(diff: string): string {
+        const lines = diff.split("\n");
+        const keep: string[] = [];
+        const contextRadius = 2;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Skip other metadata
+            if (/^(index|Binary files|old mode|new mode)/.test(line)) {
+                continue;
+            }
+
+            // Keep file headers
+            if (line.startsWith('diff --git ')) {
+                keep.push(line);
+                continue;
+            }
+
+            // Handle @@ lines: keep only context text after them
+            if (line.startsWith('@@')) {
+                const cleaned = line.replace(/^@@.*@@ ?/, "").trim();
+                if (cleaned.length > 0) {
+                    keep.push(cleaned);
+                }
+
+                continue;
+            }
+
+            // Keep modified lines and a few context ones
+            if (/^[+-]/.test(line)) {
+                if(line.startsWith('+++') || line.startsWith('---')) {
+                    keep.push(line);
+                    continue;
+                }
+
+                const start = Math.max(0, i - contextRadius);
+                const end = Math.min(lines.length, i + contextRadius + 1);
+                for (let j = start; j < end; j++) {
+                    const neighbor = lines[j];
+                    if (/^(index|@@|Binary files|old mode|new mode)/.test(neighbor)) {
+                        continue
+                    }
+
+                    if (!keep.includes(neighbor)) {
+                        keep.push(neighbor);
+                    }
+                }
+            }
+        }
+
+        return keep.join("\n").trim();
+    }
+
+
 
     private async getFinalConfig(flags: AutoCommitFlags) {
         // const finalConfig: AutoCommitUpdateConfig = {}
