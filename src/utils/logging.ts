@@ -2,6 +2,8 @@ import {Command} from "@oclif/core";
 import chalk from "chalk";
 import * as z from "zod";
 
+import {FATAL_ERROR_NUMBER} from "./constants.js";
+
 /**
  * Info logs (normal operation).
  */
@@ -30,7 +32,7 @@ export function fatal(ctx: Command, message: string): never {
     const formatted = `${chalk.red.bold("💥 FATAL:")} ${chalk.red(message)}`;
 
     ctx.log(formatted);
-    return ctx.exit(1);
+    return ctx.exit(FATAL_ERROR_NUMBER);
 }
 
 export function zodError(ctx: Command, error: z.ZodError) {

@@ -1,8 +1,9 @@
 import { input, select } from "@inquirer/prompts";
-import {Command, Flags, Interfaces} from "@oclif/core";
+import {Command, Errors, Flags, Interfaces} from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
+import {FATAL_ERROR_NUMBER} from "../../utils/constants.js";
 import {createSpinner} from "../../utils/create-spinner.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -23,7 +24,12 @@ export default class AutoCommitCommand extends Command {
     };
     public readonly commandId = "auto-commit";
 
-    async catch() {
+    async catch(error: unknown) {
+        // skip errors already logged by LOGGER.fatal
+        if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
+            return;
+        }
+
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
