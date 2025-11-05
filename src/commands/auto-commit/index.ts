@@ -5,6 +5,7 @@ import { simpleGit } from "simple-git";
 
 import {FATAL_ERROR_NUMBER} from "../../utils/constants.js";
 import {createSpinner} from "../../utils/create-spinner.js";
+import {isOnline} from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import {promptForValue} from "../../utils/prompt-for-value.js";
@@ -45,6 +46,7 @@ export default class AutoCommitCommand extends Command {
         }
 
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
+        await isOnline(this)
 
         const spinner = createSpinner({
             text: "Analyzing staged files for commit message generation...",
