@@ -1,11 +1,12 @@
 import {input, select} from "@inquirer/prompts";
-import {Args, Command, Flags} from "@oclif/core";
+import {Args, Command, Errors, Flags} from "@oclif/core";
 import chalk from "chalk";
 import {simpleGit} from "simple-git";
 
 import {getService} from "../../services/index.js";
 import {IssueSummary} from "../../types/issue-summary.js";
 import {checkIfInGitRepository} from "../../utils/check-if-in-git-repository.js";
+import {FATAL_ERROR_NUMBER} from "../../utils/constants.js";
 import {createSpinner} from "../../utils/create-spinner.js";
 import {gatherAutoBranchConfigForHostname} from "../../utils/gather-auto-branch-config.js";
 import {getSchemaForUnionOfAutoBranch} from "../../utils/get-schema-for-union-of-auto-branch.js";
@@ -37,7 +38,12 @@ export default class AutoBranchCommand extends Command {
     };
     public readonly commandId = "auto-branch";
 
-    async catch() {
+    async catch(error: unknown) {
+        // skip errors already logged by LOGGER.fatal
+        if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
+            return;
+        }
+
         this.log(chalk.red("🚫 Branch creation cancelled."));
     }
 
