@@ -1,5 +1,5 @@
 import { input, select } from "@inquirer/prompts";
-import {Command, Errors, Flags, Interfaces} from "@oclif/core";
+import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
@@ -8,10 +8,10 @@ import {createSpinner} from "../../utils/create-spinner.js";
 import {isOnline} from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
-import {promptForValue} from "../../utils/prompt-for-value.js";
-import {saveGatheredSettings} from "../../utils/save-gathered-settings.js";
+import { promptForValue } from "../../utils/prompt-for-value.js";
+import { saveGatheredSettings } from "../../utils/save-gathered-settings.js";
 import { loadMergedUserConfig } from "../../utils/user-config.js";
-import {AutoCommitConfigSchema, AutoCommitUpdateConfig} from "../../zod-schema/auto-commit-config.js";
+import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema/auto-commit-config.js";
 
 type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
 
@@ -34,15 +34,42 @@ export default class AutoCommitCommand extends Command {
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
+    async getDiff() {
+        const git = simpleGit();
+
+        const stagedFiles = (await git.diff(["--cached", "--name-only"]))
+            .split("\n")
+            .filter(Boolean)
+
+        if (stagedFiles.length === 0) {
+            return "";
+        }
+
+        const collapsedFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
+        const fullDiffFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
+        if(fullDiffFiles.length === 0) {
+            // if we just have a single file staged, but it is not relevant, we should not generate a commit message just based on the file name
+            return git.diff(["--cached", "--stat"])
+        }
+
+        const diffs = await Promise.all(
+            [
+                // diffs of files that are not collapsed
+                ...fullDiffFiles.map(file => git.diff(["--cached", file])),
+
+                // just stats of collapsed files since they are not really relevant for the commit message
+                ...collapsedFiles.map(file => git.diff(["--cached", "--stat", file]))
+            ]
+        );
+
+        return diffs.join("\n");
+    }
+
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
-
-        const git = simpleGit();
-        const diff = await git.diff(["--cached"]);
-
-        if (diff.trim().length === 0) {
-            this.log(chalk.red("❌ No staged files to create a commit message"));
-            return;
+        const diff = await this.getDiff();
+        if(diff.trim().length === 0) {
+            LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
@@ -60,10 +87,11 @@ export default class AutoCommitCommand extends Command {
             spinner.text = "Generating commit message from staged files...";
             spinner.start()
             commitMessage = await chat.generate();
+
             spinner.stop()
 
             if (!commitMessage) {
-                this.error(chalk.red("❌ No commit message received from Groq API"));
+                LOGGER.fatal(this, "No commit message received from Groq API");
             }
 
             finished = await this.handleUserDecision(commitMessage, chat);
@@ -77,6 +105,26 @@ export default class AutoCommitCommand extends Command {
             GROQ_API_KEY: finalGroqApiKey,
             INSTRUCTIONS: finalInstructions,
         })
+    }
+
+    shouldIncludeFile(file: string, ignorePatterns: string[] = [
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "*.lock",
+        "*.min.js",
+        "dist/**",
+        "build/**",
+        "node_modules/**",
+    ]) {
+        return !ignorePatterns.some(pattern => {
+            if (pattern.includes("*")) {
+                const regex = new RegExp("^" + pattern.replaceAll('**', ".*").replaceAll('*', "[^/]*") + "$");
+                return regex.test(file);
+            }
+
+            return file === pattern;
+        });
     }
 
     private async buildInitialMessages(instructions: string, diff: string) {
@@ -124,14 +172,14 @@ ${diff}
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForValue({key: 'GROQ_API_KEY', schema: AutoCommitConfigSchema.shape.GROQ_API_KEY})
+            finalGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoCommitConfigSchema.shape.GROQ_API_KEY })
             askForSavingSettings = true;
         }
 
         let finalInstructions = flags.instructions ?? userConfig.INSTRUCTIONS;
         if (!finalInstructions) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
-            finalInstructions = await promptForValue({currentValue: "Keep it short and conventional", key: 'INSTRUCTIONS', schema: AutoCommitConfigSchema.shape.INSTRUCTIONS})
+            finalInstructions = await promptForValue({ currentValue: "Keep it short and conventional", key: 'INSTRUCTIONS', schema: AutoCommitConfigSchema.shape.INSTRUCTIONS })
             askForSavingSettings = true;
         }
 
