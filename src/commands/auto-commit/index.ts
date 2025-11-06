@@ -221,7 +221,6 @@ ${diff}
             // Keep modified lines and a few context ones
             if (/^[+-]/.test(line)) {
                 if(line.startsWith('+++') || line.startsWith('---')) {
-                    keep.push(line);
                     continue;
                 }
 
