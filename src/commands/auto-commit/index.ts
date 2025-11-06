@@ -50,22 +50,34 @@ export default class AutoCommitCommand extends Command {
             return "";
         }
 
-        const collapsedFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
-        const fullDiffFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
-        if(fullDiffFiles.length === 0) {
+        const ignoredFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
+        const includedFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
+
+        // TODO want to exclude files which have just spaces as changes and are not relevant for the commit message
+        // if then there are no changes staged with real changes, we just use the file names and stats to generate a commit message
+
+        const includedFilesWithNoSyntacticChanges = ignoredFiles.filter(full => {})
+        if(includedFiles.length === 0) {
             // if we just have a single file staged, but it is not relevant, we should not generate a commit message just based on the file name
             return git.diff(["--cached", "--stat"])
         }
 
+        console.log('includedFiles :>>', includedFiles);
+
+
         const diffs = await Promise.all(
             [
                 // diffs of files that are not collapsed
-                ...fullDiffFiles.map(file => git.diff(["--cached", file])),
+                // ...includedFiles.map(file => git.diff(["--cached", file])),
+                ...includedFiles.map(file => git.diff(["--cached", "-w", "--ignore-blank-lines", file])),
 
                 // just stats of collapsed files since they are not really relevant for the commit message
-                ...collapsedFiles.map(file => git.diff(["--cached", "--stat", file]))
+                ...ignoredFiles.map(file => git.diff(["--cached", "--stat", file]))
             ]
         );
+
+        console.log('diffs :>>', diffs);
+
 
         const finalDiffs = stripDiff ?
             diffs.map(diff => this.filterDiffForLLM(diff)) :
