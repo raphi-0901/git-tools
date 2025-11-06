@@ -168,22 +168,7 @@ ${diff}
     }
 
     /**
-     * Filters out nonessential lines from a git diff to save LLM tokens.
-     * Keeps only actual content changes (+/-), file names, and headers.
-     */
-    /**
-     * Filters a git diff for LLM input:
-     * - Keeps added/removed lines and a few context lines around them
-     * - Removes index, position, and binary noise
-     */
-    /**
-     * Filters a git diff for LLM input:
-     * - Keeps changed lines (+/-) and a few neutral context lines
-     * - Removes @@, index, and binary/metadata lines
-     * - Keeps file headers (diff --git)
-     */
-    /**
-     * Filters a git diff for LLM input:
+     * Filters a git diff for LLM input to minimize tokens:
      * - Keeps changed lines (+/-) and limited context
      * - Keeps @@ lines but strips the position info (only keeps trailing context)
      * - Removes index, binary, and other metadata lines
