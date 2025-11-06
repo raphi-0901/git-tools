@@ -2,42 +2,42 @@ import { decode, encode, isWithinTokenLimit } from 'gpt-tokenizer'
 
 export function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number): string[] {
     const sortedIndexedDiffs = diffs
-        .map((diff, index) => ({ diff, index }))
+        .map((diff, initialIndex) => ({ diff, initialIndex }))
         .sort((a, b) => a.diff.length - b.diff.length);
 
-    const kept: { diff: string; index: number }[] = []
     let remainingTokens = maxTokens;
     let remainingTokensPerDiff = remainingTokens / diffs.length;
+    const kept: { diff: string; initialIndex: number }[] = [];
 
-    for (const { diff, index } of sortedIndexedDiffs) {
-        const withinTokenLimit = isWithinTokenLimit(diff, remainingTokensPerDiff)
-        remainingTokens -= withinTokenLimit || remainingTokensPerDiff;
+    for (let i = 0; i < sortedIndexedDiffs.length; i++) {
+        const { diff, initialIndex } = sortedIndexedDiffs[i];
+        const withinTokenLimit = isWithinTokenLimit(diff, remainingTokensPerDiff);
 
-        // the diff is too long to fit in the token limit, so we trim it and keep the shortened version
-        if(!withinTokenLimit) {
-            // encode and decode the diff and trim it to the remaining token limit
-            kept.push(
-                {
-                    diff: decode(encode(diff).slice(0, remainingTokensPerDiff)),
-                    index,
-                }
-            )
-            continue;
+        console.log('withinTokenLimit :>>', withinTokenLimit);
+
+
+        if (withinTokenLimit === false) {
+            // we should keep the first 3 lines, so basic informations like which diff
+
+            console.log('Diff to long:', diff);
+
+
+            // Too long: trim it and keep the shortened version
+            const trimmed = decode(encode(diff).slice(0, remainingTokensPerDiff));
+            kept.push({ diff: trimmed, initialIndex });
+            remainingTokens -= remainingTokensPerDiff;
+        } else {
+            // Fits fine
+            kept.push({ diff, initialIndex });
+            remainingTokens -= withinTokenLimit;
         }
 
-        if (index < diffs.length - 1) {
-            remainingTokensPerDiff = remainingTokens / (diffs.length - 1 - index);
+        const remainingCount = sortedIndexedDiffs.length - 1 - i;
+        if (remainingCount > 0) {
+            remainingTokensPerDiff = remainingTokens / remainingCount;
         }
-
-        kept.push(
-            {
-                diff,
-                index,
-            }
-        )
     }
 
-    kept.sort((a, b) => a.index - b.index)
-
-    return kept.map(k => k.diff)
+    kept.sort((a, b) => a.initialIndex - b.initialIndex);
+    return kept.map(k => k.diff);
 }

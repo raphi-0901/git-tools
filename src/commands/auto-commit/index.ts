@@ -3,8 +3,9 @@ import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
-import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
+import { FATAL_ERROR_NUMBER, MAX_TOKENS } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
+import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -66,9 +67,11 @@ export default class AutoCommitCommand extends Command {
             ]
         );
 
-        return stripDiff
-            ? this.filterDiffForLLM(diffs.join("\n"))
-            : diffs.join("\n")
+        const finalDiffs = stripDiff ?
+            diffs.map(diff => this.filterDiffForLLM(diff)) :
+            diffs;
+
+        return fitDiffsWithinTokenLimit(finalDiffs, MAX_TOKENS).join("\n");
     }
 
     async run(): Promise<void> {
