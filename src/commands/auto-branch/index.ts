@@ -10,6 +10,7 @@ import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gather-auto-branch-config.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
+import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";
@@ -59,6 +60,7 @@ export default class AutoBranchCommand extends Command {
         const issueUrl = new URL(args.issueUrl);
         const { hostname } = issueUrl;
         const { askForSavingSettings, finalGroqApiKey, finalServiceConfigOfHostname } = await this.getFinalConfig(hostname)
+        await isOnline(this)
 
         this.spinner.text = "Analyzing issue for branch name generation...\n"
         this.spinner.start();
