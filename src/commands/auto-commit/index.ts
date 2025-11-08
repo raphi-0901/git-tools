@@ -29,6 +29,7 @@ export default class AutoCommitCommand extends Command {
         }),
     };
     public readonly commandId = "auto-commit";
+    public readonly spinner = createSpinner();
 
     async catch(error: unknown) {
         // skip errors already logged by LOGGER.fatal
@@ -106,20 +107,19 @@ export default class AutoCommitCommand extends Command {
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
         await isOnline(this)
 
-        const spinner = createSpinner({
-            text: "Analyzing staged files for commit message generation...",
-        }).start();
 
+        this.spinner.text = "Analyzing staged files for commit message generation..."
+        this.spinner.start();
 
         const chat = new LLMChat(finalGroqApiKey, await this.buildInitialMessages(finalInstructions, diff));
         let finished = false;
         let commitMessage = "";
         while (!finished) {
-            spinner.text = "Generating commit message from staged files...";
-            spinner.start()
+            this.spinner.text = "Generating commit message from staged files...";
+            this.spinner.start()
             commitMessage = await chat.generate();
 
-            spinner.stop()
+            this.spinner.stop()
 
             if (!commitMessage) {
                 LOGGER.fatal(this, "No commit message received from Groq API");

@@ -31,12 +31,13 @@ export default class AutoBranchCommand extends Command {
     };
     static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
     static flags = {
-        instructions: Flags.string({
+            instructions: Flags.string({
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
         }),
     };
     public readonly commandId = "auto-branch";
+    public readonly spinner = createSpinner();
 
     async catch(error: unknown) {
         // skip errors already logged by LOGGER.fatal
@@ -59,9 +60,8 @@ export default class AutoBranchCommand extends Command {
         const { hostname } = issueUrl;
         const { askForSavingSettings, finalGroqApiKey, finalServiceConfigOfHostname } = await this.getFinalConfig(hostname)
 
-        const spinner = createSpinner({
-            text: "Analyzing issue for branch name generation...",
-        }).start();
+        this.spinner.text = "Analyzing issue for branch name generation...\n"
+        this.spinner.start();
 
         const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);
         if (!service) {
@@ -84,10 +84,10 @@ export default class AutoBranchCommand extends Command {
 
         let finished = false;
         while (!finished) {
-            spinner.text = "Generating branch name from issue...";
-            spinner.start()
+            this.spinner.text = "Generating branch name from issue...";
+            this.spinner.start()
             const branchName = await chat.generate();
-            spinner.stop()
+            this.spinner.stop()
 
             if (!branchName) {
                 LOGGER.fatal(this, "No branch name received from Groq API");
