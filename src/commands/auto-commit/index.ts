@@ -48,35 +48,42 @@ export default class AutoCommitCommand extends Command {
             .split("\n")
             .filter(Boolean)
 
+        // should never happen, but just in case
         if (stagedFiles.length === 0) {
             return "";
         }
 
+        /**
+            Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
+         */
         const ignoredFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
+        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.map(file =>  git.diff(["--cached", "--stat", file])))
+
+        /**
+         * Files which are investigated further
+         */
         const includedFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
+        const includedBlankLinesDiffs = await Promise.all(includedFiles.map(file =>  git.diff(["--cached", "-w", "--ignore-blank-lines", file])))
 
-        // TODO want to exclude files which have just spaces as changes and are not relevant for the commit message
-        // if then there are no changes staged with real changes, we just use the file names and stats to generate a commit message
+        // filter out files which have no syntactical changes
+        const relevantDiffs = includedBlankLinesDiffs.filter(item => item.trim() !== "")
+        const nonSyntacticalDiffs = includedBlankLinesDiffs.filter(item => item.trim() === "")
 
-        const includedFilesWithNoSyntacticChanges = ignoredFiles.filter(full => {})
-        if(includedFiles.length === 0) {
-            // if we just have a single file staged, but it is not relevant, we should not generate a commit message just based on the file name
-            return git.diff(["--cached", "--stat"])
+        // if there are just spaces as changes, we should not generate a commit message just based on the file name
+        if(relevantDiffs.length === 0) {
+            return `The following files have no syntactic changes:\n${includedFiles.join(", ")}`
         }
 
-        console.log('includedFiles :>>', includedFiles);
 
 
-        const diffs = await Promise.all(
-            [
-                // diffs of files that are not collapsed
-                // ...includedFiles.map(file => git.diff(["--cached", file])),
-                ...includedFiles.map(file => git.diff(["--cached", "-w", "--ignore-blank-lines", file])),
+        const finalDiffs = [
+            ...relevantDiffs,
+            ...nonSyntacticalDiffs,
+            ...ignoredFilesDiffStats,
+        ]
 
-                // just stats of collapsed files since they are not really relevant for the commit message
-                ...ignoredFiles.map(file => git.diff(["--cached", "--stat", file]))
-            ]
-        );
+
+
 
         console.log('diffs :>>', diffs);
 
@@ -97,15 +104,6 @@ export default class AutoCommitCommand extends Command {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
-        console.log(diff);
-
-
-        // const tokens = await estimateTokens(diff);
-        // console.log('token :>>', tokens);
-        // if(tokens > 9000) {
-        //     LOGGER.fatal(this, "The diff is too long. Please split it into smaller chunks.");
-        // }
-
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
         await isOnline(this)
 
@@ -114,6 +112,9 @@ export default class AutoCommitCommand extends Command {
         this.spinner.start();
 
         const chat = new LLMChat(finalGroqApiKey, await this.buildInitialMessages(finalInstructions, diff));
+
+        // TODO use this to maximize tokens size
+        await chat.getRemainingTokens();
         let finished = false;
         let commitMessage = "";
         while (!finished) {
