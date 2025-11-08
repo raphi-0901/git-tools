@@ -3,6 +3,7 @@ import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
+import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
 import { FATAL_ERROR_NUMBER, MAX_TOKENS } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
@@ -91,7 +92,8 @@ export default class AutoCommitCommand extends Command {
         const { flags } = await this.parse(AutoCommitCommand);
         const diff = await this.getDiff(flags.stripDiff);
 
-        if(diff.trim().length === 0) {
+        const filesStaged = await checkIfFilesStaged();
+        if(!filesStaged) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
