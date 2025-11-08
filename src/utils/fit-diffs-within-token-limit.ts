@@ -1,54 +1,63 @@
-import { decode, encode, isWithinTokenLimit } from 'gpt-tokenizer'
+import { decode, encode, isWithinTokenLimit } from '../utils/gpt-tokenizer.js'
 
-export function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number): string[] {
-    const sortedIndexedDiffs = diffs
-        .map((diff, initialIndex) => ({ diff, initialIndex }))
-        .sort((a, b) => a.diff.length - b.diff.length);
+/**
+ * Fit diffs within a given token limit.
+ *
+ * @param diffGroups An array of diff sections, where each section is an array of diff strings.
+ * @param maxTokens The maximum total number of tokens allowed.
+ * @returns A trimmed version of `diffGroups`, ensuring total tokens stay within the limit.
+ */
+export function fitDiffsWithinTokenLimit(diffGroups: string[][], maxTokens: number) {
+    // Attach original indices to each diff and sort by diff length (shortest first)
+    const sortedDiffGroups = diffGroups.map(section =>
+        section
+            .map((diffText, originalIndex) => ({ diffText, originalIndex }))
+            .sort((a, b) => a.diffText.length - b.diffText.length)
+    );
 
-    let remainingTokens = maxTokens;
-    let remainingTokensPerDiff = remainingTokens / diffs.length;
-    const kept: { diff: string; initialIndex: number }[] = [];
+    let tokensLeft = maxTokens;
+    let avgTokensPerDiff = tokensLeft / sortedDiffGroups.flat().length;
+    const keptDiffGroups: { diffText: string; originalIndex: number }[][] = [];
 
-    // todo what to do if there are too many diffs?
-    // maybe only keep the first n diffs or something like that
-    // another option is to let an llm decide what to keep and what to trim
+    // TODO: handle case where there are far too many diffs —
+    // could discard extras or use LLM-based prioritization.
 
-    for (let i = 0; i < sortedIndexedDiffs.length; i++) {
-        const { diff, initialIndex } = sortedIndexedDiffs[i];
-        const withinTokenLimit = isWithinTokenLimit(diff, remainingTokensPerDiff);
+    for (const [groupIndex, section] of sortedDiffGroups.entries()) {
+        keptDiffGroups.push([]);
 
+        for (const [diffIndex, { diffText, originalIndex }] of section.entries()) {
+            const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
 
-        console.log('---------------------------------------');
-        console.log('withinTokenLimit :>>', withinTokenLimit);
-        console.log('remainingTokens :>>', remainingTokens);
-        console.log('remainingTokensPerDiff :>>', remainingTokensPerDiff);
+            console.log('---------------------------------------');
+            console.log('fitsWithinLimit :>>', fitsWithinLimit);
+            console.log('tokensLeft :>>', tokensLeft);
+            console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
 
+            if (fitsWithinLimit === false) {
+                const tokenCount = encode(diffText).length;
+                console.log('tokenCount :>>', tokenCount);
 
+                // TODO: consider trimming equally from start and end while preserving diff headers
+                const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
+                keptDiffGroups[groupIndex].push({ diffText: trimmedDiff, originalIndex });
+                tokensLeft -= avgTokensPerDiff;
+            } else {
+                keptDiffGroups[groupIndex].push({ diffText, originalIndex });
+                tokensLeft -= fitsWithinLimit;
+            }
 
-        if (withinTokenLimit === false) {
-            console.log('tokensOfDiff :>>', encode(diff).length);
+            console.log('---------------------------------------');
 
-            // TODO: maybe trim of the end and the start at the same amount??
-            // but we should keep the first 3 lines, so basic informations like which diff
-
-            // Too long: trim it and keep the shortened version
-            const trimmed = decode(encode(diff).slice(0, remainingTokensPerDiff));
-            kept.push({ diff: trimmed, initialIndex });
-            remainingTokens -= remainingTokensPerDiff;
-        } else {
-            // Fits fine
-            kept.push({ diff, initialIndex });
-            remainingTokens -= withinTokenLimit;
+            const remainingDiffs = section.length - 1 - diffIndex;
+            if (remainingDiffs > 0) {
+                avgTokensPerDiff = tokensLeft / remainingDiffs;
+            }
         }
 
-        console.log('---------------------------------------');
-
-        const remainingCount = sortedIndexedDiffs.length - 1 - i;
-        if (remainingCount > 0) {
-            remainingTokensPerDiff = remainingTokens / remainingCount;
-        }
+        // Restore the original order within the section
+        keptDiffGroups[groupIndex].sort((a, b) => a.originalIndex - b.originalIndex);
     }
 
-    kept.sort((a, b) => a.initialIndex - b.initialIndex);
-    return kept.map(k => k.diff);
+    // Return only the diff text strings, in section structure
+    return keptDiffGroups.flatMap(section => section.flatMap(({ diffText }) => diffText));
 }
