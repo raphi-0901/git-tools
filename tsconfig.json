@@ -1,12 +1,17 @@
 {
   "compilerOptions": {
+    "jsx": "react",
     "declaration": true,
     "module": "Node16",
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
-    "target": "esnext",
-    "moduleResolution": "node16",
+    "target": "ESNext",
+    "moduleResolution": "Node16",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": ["./src/**/*"],
   "ts-node": {
