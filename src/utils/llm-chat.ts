@@ -1,6 +1,6 @@
 import * as OpenAI from "openai";
 
-import { STANDARD_LLM_MODEL } from "./constants.js";
+import { GROQ_BASE_URL, STANDARD_LLM_MODEL } from "./constants.js";
 
 export type ChatMessage = OpenAI.OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -8,7 +8,7 @@ export class LLMChat {
     private client: OpenAI.OpenAI;
     private messages: ChatMessage[];
 
-    constructor(apiKey: string, initialMessages: ChatMessage[] = [], baseURL = "https://api.groq.com/openai/v1") {
+    constructor(apiKey: string, initialMessages: ChatMessage[] = [], baseURL = GROQ_BASE_URL) {
         this.client = new OpenAI.OpenAI({ apiKey, baseURL });
         this.messages = [...initialMessages];
     }
