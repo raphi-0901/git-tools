@@ -36,6 +36,8 @@ export default class AutoCommitCommand extends Command {
     public readonly spinner = createSpinner();
 
     async catch(error: unknown) {
+        LOGGER.error(this, error as string)
+
         // skip errors already logged by LOGGER.fatal
         if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
             return;
@@ -99,23 +101,16 @@ export default class AutoCommitCommand extends Command {
         const { flags } = await this.parse(AutoCommitCommand);
 
         // Use the helper to render TextBox and get user input
-        try {
-            const result = await renderCommitMessageInput();
-
-            console.log(result);
-
-
-            if(result) {
-                this.log(`Received input - First: ${result.message}, Second: ${result.description}`);
-        }
-        }
-            catch (error) {
-            this.log("TextBox error:", error);
-        }
+        // try {
+        //     const result = await renderCommitMessageInput();
+        //
+        //     console.log(result);
+        // }
+        //     catch (error) {
+        //     this.log("TextBox error:", error);
+        // }
 
         const filesStaged = await checkIfFilesStaged();
-        console.log('filesStaged :>>', filesStaged);
-
         if(!filesStaged) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
@@ -125,7 +120,6 @@ export default class AutoCommitCommand extends Command {
 
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start();
-
 
         const remainingTokensForLLM = await getRemainingTokensOfLLMChat({
             apiKey: finalGroqApiKey,
@@ -139,11 +133,6 @@ export default class AutoCommitCommand extends Command {
 
         // fit diff into token limit
         const diff = await this.getDiff(remainingTokensForLLM - tokensOfInitialMessages);
-
-        console.log('diff :>>', diff);
-
-
-        console.log('countTokens(diff) :>>', countTokens(diff));
 
         initialMessages.push({
             content: diff,
@@ -281,8 +270,6 @@ Diffs of Staged Files:
         return keep.join("\n").trim();
     }
 
-
-
     private async getFinalConfig(flags: AutoCommitFlags) {
         // const finalConfig: AutoCommitUpdateConfig = {}
         // let askForSavingSettings = false;
@@ -350,12 +337,17 @@ Diffs of Staged Files:
             }
 
             case "edit": {
-                const userEdit = await input({
-                    default: commitMessage,
-                    message: "Enter your custom commit message:",
-                })
+                const [firstLine, rest] = this.transformGeneratedCommitMessage(commitMessage);
+                const result = await renderCommitMessageInput({
+                    description: rest.split("\n"),
+                    message: firstLine
+                });
 
-                await git.commit(this.transformGeneratedCommitMessage(userEdit));
+                if(!result) {
+                    LOGGER.fatal(this, "No commit message received from TextBox.");
+                }
+
+                await git.commit([result.message, ...result.description]);
                 this.log(chalk.green("✅ Commit executed with custom message!"));
                 return true;
             }
