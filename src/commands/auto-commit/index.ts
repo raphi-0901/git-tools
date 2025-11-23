@@ -157,6 +157,9 @@ export default class AutoCommitCommand extends Command {
             finished = await this.handleUserDecision(commitMessage, chat);
         }
 
+        const s = await renderCommitMessageInput();
+        console.log('s :>>', s);
+
         if (!askForSavingSettings) {
             return;
         }
@@ -338,17 +341,24 @@ Diffs of Staged Files:
 
             case "edit": {
                 const [firstLine, rest] = this.transformGeneratedCommitMessage(commitMessage);
+                try {
+
                 const result = await renderCommitMessageInput({
                     description: rest.split("\n"),
                     message: firstLine
                 });
+                    if(!result) {
+                        LOGGER.fatal(this, "No commit message received from TextBox.");
+                    }
 
-                if(!result) {
-                    LOGGER.fatal(this, "No commit message received from TextBox.");
+                    await git.commit([result.message, ...result.description]);
+                    this.log(chalk.green("✅ Commit executed with custom message!"));
+
+                } catch(error) {
+                    LOGGER.error(this, error as string)
                 }
 
-                await git.commit([result.message, ...result.description]);
-                this.log(chalk.green("✅ Commit executed with custom message!"));
+
                 return true;
             }
 

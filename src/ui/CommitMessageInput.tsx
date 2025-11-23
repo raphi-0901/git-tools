@@ -13,12 +13,13 @@ export type FormValues = {
 type InkFormProps = {
     // Add an optional defaultValues prop
     defaultValues?: FormValues;
+    onCancel: () => void;
     onSubmit: (values: FormValues | null) => void;
 };
 
 const HEIGHT = 6;
 
-export const CommitMessageInput = ({ defaultValues, onSubmit }: InkFormProps) => {
+export const CommitMessageInput = ({ defaultValues, onCancel, onSubmit }: InkFormProps) => {
     const [activeInput, setActiveInput] = useState<"first" | "second">("first");
     const [commitMessage, setCommitMessage] = useState(defaultValues?.message || "");
     const [commitDescription, setCommitDescription] = useState<string[]>(defaultValues?.description || []);
@@ -54,12 +55,12 @@ export const CommitMessageInput = ({ defaultValues, onSubmit }: InkFormProps) =>
     };
 
     useEffect(() => {
-        if (!isSubmitting) {
+        if (isCancelling) {
+            onCancel();
             return;
         }
 
-        if (isCancelling) {
-            onSubmit(null);
+        if (!isSubmitting) {
             return;
         }
 
