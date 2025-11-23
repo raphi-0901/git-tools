@@ -1,11 +1,12 @@
-import { input, select } from "@inquirer/prompts";
 import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
-import { renderCommitMessageInput } from "../../ui/CommitMessageInputHelper.js";
+import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
+import { renderSelectInput } from "../../ui/SelectInput.js";
+import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
-import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
+import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
 import { getRemainingTokensOfLLMChat } from "../../utils/get-remaining-token-of-llm-chat.js";
@@ -39,7 +40,7 @@ export default class AutoCommitCommand extends Command {
         LOGGER.error(this, error as string)
 
         // skip errors already logged by LOGGER.fatal
-        if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
+        if (error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
             return;
         }
 
@@ -59,10 +60,10 @@ export default class AutoCommitCommand extends Command {
         }
 
         /**
-            Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
+         Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
          */
         const ignoredFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
-        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.map(file =>  git.diff(["--cached", "--stat", file])))
+        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.map(file => git.diff(["--cached", "--stat", file])))
 
         /**
          * Files which are investigated further
@@ -78,7 +79,7 @@ export default class AutoCommitCommand extends Command {
         const nonSyntacticalDiffs = includedBlankLinesDiffs.filter(item => item.diff.trim() === "")
 
         // if there are just spaces as changes, we should not generate a commit message just based on the file name
-        if(relevantDiffs.length === 0) {
+        if (relevantDiffs.length === 0) {
             // TODO wrap in fitDiffsInLLM function
             return `The following files have no syntactic changes:\n${nonSyntacticalDiffs.map(item => item.file).join(", ")}`
         }
@@ -90,7 +91,7 @@ export default class AutoCommitCommand extends Command {
                 ...nonSyntacticalDiffs.map(item => item.file)
             ],
             [
-              "The following files are ignored because they are likely to be generated or lock files:\n",
+                "The following files are ignored because they are likely to be generated or lock files:\n",
                 ...ignoredFilesDiffStats,
             ]
         ], remainingTokens)
@@ -100,18 +101,8 @@ export default class AutoCommitCommand extends Command {
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
 
-        // Use the helper to render TextBox and get user input
-        // try {
-        //     const result = await renderCommitMessageInput();
-        //
-        //     console.log(result);
-        // }
-        //     catch (error) {
-        //     this.log("TextBox error:", error);
-        // }
-
         const filesStaged = await checkIfFilesStaged();
-        if(!filesStaged) {
+        if (!filesStaged) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
@@ -139,7 +130,7 @@ export default class AutoCommitCommand extends Command {
             role: "user",
         })
 
-        const chat = new LLMChat(finalGroqApiKey,initialMessages);
+        const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let finished = false;
         let commitMessage = "";
@@ -156,9 +147,6 @@ export default class AutoCommitCommand extends Command {
 
             finished = await this.handleUserDecision(commitMessage, chat);
         }
-
-        const s = await renderCommitMessageInput();
-        console.log('s :>>', s);
 
         if (!askForSavingSettings) {
             return;
@@ -251,7 +239,7 @@ Diffs of Staged Files:
 
             // Keep modified lines and a few context ones
             if (/^[+-]/.test(line)) {
-                if(line.startsWith('+++') || line.startsWith('---')) {
+                if (line.startsWith('+++') || line.startsWith('---')) {
                     continue;
                 }
 
@@ -294,14 +282,33 @@ Diffs of Staged Files:
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoCommitConfigSchema.shape.GROQ_API_KEY })
+
+            const promptedGroqApiKey = await promptForValue({
+                key: 'GROQ_API_KEY',
+                schema: AutoCommitConfigSchema.shape.GROQ_API_KEY
+            })
+            if (!promptedGroqApiKey) {
+                LOGGER.fatal(this, "No GROQ_API_KEY received from TextBox.");
+            }
+
+            finalGroqApiKey = promptedGroqApiKey;
             askForSavingSettings = true;
         }
 
         let finalInstructions = flags.instructions ?? userConfig.INSTRUCTIONS;
         if (!finalInstructions) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
-            finalInstructions = await promptForValue({ currentValue: "Keep it short and conventional", key: 'INSTRUCTIONS', schema: AutoCommitConfigSchema.shape.INSTRUCTIONS })
+
+            const promptedFinalInstructions = await promptForValue({
+                currentValue: "Keep it short and conventional",
+                key: 'INSTRUCTIONS',
+                schema: AutoCommitConfigSchema.shape.INSTRUCTIONS
+            })
+            if (!promptedFinalInstructions) {
+                LOGGER.fatal(this, "No GROQ_API_KEY received from TextBox.");
+            }
+
+            finalInstructions = promptedFinalInstructions
             askForSavingSettings = true;
         }
 
@@ -317,12 +324,12 @@ Diffs of Staged Files:
         this.log(chalk.blue("\n🤖 Suggested commit message:"));
         this.log(`   ${chalk.green(commitMessage)}\n`);
 
-        const decision = await select({
-            choices: [
-                { name: "✅ Accept and commit", value: "accept" },
-                { name: "✍️ Edit manually", value: "edit" },
-                { name: "🔁 Provide feedback", value: "feedback" },
-                { name: "❌ Cancel", value: "cancel" },
+        const decision = await renderSelectInput({
+            items: [
+                { label: "✅ Accept and commit", value: "accept" },
+                { label: "✍️ Edit manually", value: "edit" },
+                { label: "🔁 Provide feedback", value: "feedback" },
+                { label: "❌ Cancel", value: "cancel" },
             ] as const,
             message: "What would you like to do?",
         })
@@ -341,31 +348,30 @@ Diffs of Staged Files:
 
             case "edit": {
                 const [firstLine, rest] = this.transformGeneratedCommitMessage(commitMessage);
-                try {
-
                 const result = await renderCommitMessageInput({
                     description: rest.split("\n"),
                     message: firstLine
                 });
-                    if(!result) {
-                        LOGGER.fatal(this, "No commit message received from TextBox.");
-                    }
 
-                    await git.commit([result.message, ...result.description]);
-                    this.log(chalk.green("✅ Commit executed with custom message!"));
-
-                } catch(error) {
-                    LOGGER.error(this, error as string)
+                if (result === null) {
+                    this.exit(SIGINT_ERROR_NUMBER)
                 }
 
+                await git.commit([result.message, ...result.description]);
+                this.log(chalk.green("✅ Commit executed with custom message!"));
 
                 return true;
             }
 
             case "feedback": {
-                const feedback = await input({
+                const feedback = await renderTextInput({
                     message: "Provide your feedback for the LLM:",
                 });
+
+                if (!feedback) {
+                    LOGGER.fatal(this, "No feedback received from TextBox.");
+                }
+
                 chat.addMessage(feedback, "user");
                 return false;
             }
@@ -378,7 +384,7 @@ Diffs of Staged Files:
 
     private transformGeneratedCommitMessage(commitMessage: string) {
         const indexOfLineBreak = commitMessage.indexOf("\n");
-        if(indexOfLineBreak === -1) {
+        if (indexOfLineBreak === -1) {
             return commitMessage;
         }
 

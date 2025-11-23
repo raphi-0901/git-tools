@@ -1,12 +1,13 @@
-import { input, select } from "@inquirer/prompts";
 import { Args, Command, Errors, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
 import { getService } from "../../services/index.js";
 import { IssueSummary } from "../../types/issue-summary.js";
+import { renderSelectInput } from "../../ui/SelectInput.js";
+import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
-import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
+import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gather-auto-branch-config.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
@@ -136,7 +137,12 @@ Ticket Description: "${issue.description}"
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoBranchConfigSchema.shape.GROQ_API_KEY })
+            const promptedGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoBranchConfigSchema.shape.GROQ_API_KEY })
+            if(!promptedGroqApiKey) {
+                this.exit(SIGINT_ERROR_NUMBER)
+            }
+
+            finalGroqApiKey = promptedGroqApiKey;
             askForSavingSettings = true;
         }
 
@@ -145,7 +151,7 @@ Ticket Description: "${issue.description}"
         if (allHostnamesFromConfig[hostname] === undefined) {
             LOGGER.warn(this, `No config found for hostname: ${hostname}`);
             askForSavingSettings = true;
-            finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
+            finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(this, Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
             if (!finalServiceConfigOfHostname) {
                 // should never happen
                 LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
@@ -168,7 +174,7 @@ Ticket Description: "${issue.description}"
                 finalServiceConfigOfHostname = isSafe.data;
             } else {
                 askForSavingSettings = true;
-                finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
+                finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(this, Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
                 if (!finalServiceConfigOfHostname) {
                     // should never happen
                     LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
@@ -193,12 +199,12 @@ Ticket Description: "${issue.description}"
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
 
-        const decision = await select({
-            choices: [
-                { name: "✅ Accept and create branch", value: "accept" },
-                { name: "✍️ Edit manually", value: "edit" },
-                { name: "🔁 Provide feedback", value: "feedback" },
-                { name: "❌ Cancel", value: "cancel" },
+        const decision = await renderSelectInput({
+            items: [
+                { label: "✅ Accept and create branch", value: "accept" },
+                { label: "✍️ Edit manually", value: "edit" },
+                { label: "🔁 Provide feedback", value: "feedback" },
+                { label: "❌ Cancel", value: "cancel" },
             ] as const,
             message: "What would you like to do?",
         });
@@ -216,14 +222,22 @@ Ticket Description: "${issue.description}"
             }
 
             case "edit": {
-                const userEdit = await input({ default: branchName, message: "Enter your custom branch name:" });
+                const userEdit = await renderTextInput({ defaultValue: branchName, message: "Enter your custom branch name:" });
+                if(userEdit === null) {
+                    this.exit(SIGINT_ERROR_NUMBER)
+                }
+
                 await git.checkoutLocalBranch(userEdit);
                 this.log(chalk.green("✅ Branch created with custom name!"));
                 return true;
             }
 
             case "feedback": {
-                const feedback = await input({ message: "Provide your feedback for the LLM:" });
+                const feedback = await renderTextInput({ message: "Provide your feedback for the LLM:" });
+                if(feedback === null) {
+                    this.exit(SIGINT_ERROR_NUMBER)
+                }
+
                 chat.addMessage(feedback, "user");
                 return false;
             }

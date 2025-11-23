@@ -1,6 +1,7 @@
 import { Command, Flags } from "@oclif/core";
 import chalk from "chalk";
 
+import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";
 import { selectConfigProperty } from "../../utils/select-config-property.js";
 import { selectConfigScope } from "../../utils/select-config-scope.js";
@@ -37,6 +38,10 @@ export default class AutoCommitConfigCommand extends Command {
             key: selectedKey,
             schema: fieldSchema,
         });
+
+        if(value === null) {
+            this.exit(SIGINT_ERROR_NUMBER)
+        }
 
         config[selectedKey] = value === "" ? undefined : value
 

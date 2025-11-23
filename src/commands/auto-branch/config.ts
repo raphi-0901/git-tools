@@ -78,7 +78,7 @@ export default class AutoBranchConfigCommand extends Command {
                 },
             );
 
-            const newGatheredConfigForHostname = await gatherAutoBranchConfigForHostname(allHostnames, hostname, configAtCurrentKey[hostname]);
+            const newGatheredConfigForHostname = await gatherAutoBranchConfigForHostname(this, allHostnames, hostname, configAtCurrentKey[hostname]);
             if(newGatheredConfigForHostname) {
                 configAtCurrentKey[hostname] = newGatheredConfigForHostname
             } else {
