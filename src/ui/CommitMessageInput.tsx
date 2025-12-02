@@ -3,6 +3,9 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import React, { useEffect, useState } from "react";
 
+import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
+import { renderCancelledQuestion } from "./helper/renderCancelledQuestion.js";
+import { renderInkComponent } from "./renderInkComponent.js";
 import { TextArea, TextAreaValue } from "./TextArea.js";
 
 export type FormValues = {
@@ -11,23 +14,23 @@ export type FormValues = {
 };
 
 type InkFormProps = {
-    // Add an optional defaultValues prop
-    defaultValues?: FormValues;
+    defaultValues: FormValues;
+    message: string;
     onCancel: () => void;
     onSubmit: (values: FormValues | null) => void;
 };
 
 const HEIGHT = 6;
 
-export const CommitMessageInput = ({ defaultValues, onCancel, onSubmit }: InkFormProps) => {
+const CommitMessageInput = ({ defaultValues, message, onCancel, onSubmit }: InkFormProps) => {
     const [activeInput, setActiveInput] = useState<"first" | "second">("first");
-    const [commitMessage, setCommitMessage] = useState(defaultValues?.message || "");
-    const [commitDescription, setCommitDescription] = useState<string[]>(defaultValues?.description || []);
+    const [commitMessage, setCommitMessage] = useState(defaultValues.message || "");
+    const [commitDescription, setCommitDescription] = useState<string[]>(defaultValues.description || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
 
     useInput((input, key) => {
-       if (key.tab) {
+        if (key.tab) {
             setActiveInput(activeInput === "first" ? "second" : "first");
         }
 
@@ -36,109 +39,102 @@ export const CommitMessageInput = ({ defaultValues, onCancel, onSubmit }: InkFor
         }
     });
 
-    const handleCommitMessageChange = (value: string) => {
-        setCommitMessage(value);
-    };
+    const handleCommitMessageChange = (value: string) => setCommitMessage(value);
 
     const handleCommitDescriptionChange = (value: null | TextAreaValue) => {
-        if(!value) {
-            setCommitDescription([])
-
-            return;
-        }
-
-        setCommitDescription(value);
+        setCommitDescription(value || []);
     };
 
-    const handleSubmit = () => {
-        setIsSubmitting(true);
-    };
+    const handleSubmit = () => setIsSubmitting(true);
 
     useEffect(() => {
         if (isCancelling) {
             onCancel();
-            return;
         }
+    }, [isCancelling]);
 
-        if (!isSubmitting) {
-            return;
-        }
+    useEffect(() => {
+        if (isSubmitting) {
+            onSubmit({
+                description: commitDescription,
+                message: commitMessage
+            });        }
+    }, [isSubmitting]);
 
-        onSubmit({
-            description: commitDescription,
-            message: commitMessage
-        });
-    }, [isSubmitting, isCancelling]);
-
-    const renderCommitMessage = () => {
-        if (activeInput === "first") {
-            return (
-                <TextInput
-                    focus={true}
-                    onChange={handleCommitMessageChange}
-                    onSubmit={handleSubmit}
-                    value={commitMessage}
-                />
-            );
-        }
-
-        return <Text>{commitMessage || " "}</Text>;
-    };
+    const renderCommitMessage = () => activeInput === "first" ? (
+        <TextInput
+            focus
+            onChange={handleCommitMessageChange}
+            onSubmit={handleSubmit}
+            value={commitMessage}
+        />
+    ) : <Text>{commitMessage || " "}</Text>;
 
     const renderCommitDescription = () => {
         if (activeInput === "second") {
-            return (
-                <TextArea
-                    defaultValue={commitDescription}
-                    height={HEIGHT}
-                    onChange={handleCommitDescriptionChange}
-                />
-            );
+            return <TextArea defaultValue={commitDescription} height={HEIGHT}
+                             onChange={handleCommitDescriptionChange}/>;
         }
 
-        // Render the commit description as a list of Text components but fill up to height lines
         const filledUpLines = Array.from({ length: HEIGHT }, (_, i) => commitDescription[i] || " ");
-        return filledUpLines.map((line, index) => (
-            <Text key={index}>{line}</Text>
-        ))
+        return filledUpLines.map((line, i) => <Text key={i}>{line}</Text>);
     };
 
-    return isSubmitting ? (
-        <Text>Submitting…</Text>
-    ) : isCancelling ? (
-        <Text>Cancelling…</Text>
-    ) : (
-        <Box flexDirection="column" gap={1}>
-            <TitledBox
-                borderColor={activeInput === "first" ? "#ff9900" : undefined}
-                borderStyle="round"
-                flexDirection="column"
-                titleJustify={"space-between"}
-                titles={["Reword commit message", `${commitMessage.length} chars`]}
-            >
-                {renderCommitMessage()}
-            </TitledBox>
+    if (isSubmitting) {
+        return renderAnsweredQuestion(message, `${commitMessage}`)
+    }
 
-            <TitledBox
-                borderColor={activeInput === "second" ? "#ff9900" : undefined}
-                borderStyle="round"
-                flexDirection="column"
-                titleJustify={"space-between"}
-                titles={[
-                    "Commit description"
-                ]}
-            >
-                {renderCommitDescription()}
-            </TitledBox>
+    if (isCancelling) {
+        return renderCancelledQuestion(message)
+    }
 
-            <Box marginTop={1}>
-                <Text>
-                    Active: {activeInput} | Press <Text color="yellow">Tab</Text> to
-                    switch, <Text color="yellow">Enter</Text> to create new line,{" "}
-                    <Text color="yellow">↑/↓/←/→</Text> to navigate. Press{" "}
-                    <Text color="yellow">Backspace</Text> on an empty line to delete it.
-                </Text>
-            </Box>
+    return <Box flexDirection="column" gap={1}>
+        <TitledBox
+            borderColor={activeInput === "first" ? "#ff9900" : undefined}
+            borderStyle="round"
+            flexDirection="column"
+            titleJustify="space-between"
+            titles={["Reword commit message", `${commitMessage.length} chars`]}
+        >
+            {renderCommitMessage()}
+        </TitledBox>
+
+        <TitledBox
+            borderColor={activeInput === "second" ? "#ff9900" : undefined}
+            borderStyle="round"
+            flexDirection="column"
+            titleJustify="space-between"
+            titles={["Commit description"]}
+        >
+            {renderCommitDescription()}
+        </TitledBox>
+
+        <Box marginTop={1}>
+            <Text>
+                Active: {activeInput} | Press <Text color="yellow">Tab</Text> to
+                switch, <Text color="yellow">Enter</Text> to create new line,{" "}
+                <Text color="yellow">↑/↓/←/→</Text> to navigate. Press{" "}
+                <Text color="yellow">Backspace</Text> on an empty line to delete it.
+            </Text>
         </Box>
-    );
+    </Box>
 };
+
+export function renderCommitMessageInput({
+                                             defaultValues,
+                                             message
+                                         }: {
+    defaultValues?: FormValues;
+    message: string;
+}) {
+    defaultValues ??= { description: [], message: "" };
+
+    return renderInkComponent<FormValues | null>(({ cancel, submit }) => (
+        <CommitMessageInput
+            defaultValues={defaultValues}
+            message={message}
+            onCancel={cancel}
+            onSubmit={submit}
+        />
+    ));
+}
