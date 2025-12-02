@@ -47,55 +47,121 @@ export default class AutoCommitCommand extends Command {
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
-    async getDiff(remainingTokens: number) {
+    async diffFilesPerType() {
         const git = simpleGit();
 
-        const stagedFiles = (await git.diff(["--cached", "--name-only"]))
-            .split("\n")
-            .filter(Boolean)
+        const stagedFiles = new Set(
+            (await git.diff(["--cached", "--name-only"]))
+                .split("\n")
+                .filter(Boolean)
+        )
 
         // should never happen, but just in case
-        if (stagedFiles.length === 0) {
-            return "";
+        if (stagedFiles.size === 0) {
+            return {
+                deletedFiles: new Set<string>(),
+                ignoredFiles: new Set<string>(),
+                nonSyntacticChangesFiles: new Set<string>(),
+                relevantFiles: new Set<string>(),
+            };
         }
+
+        const deletedFiles = new Set(
+            (await git.diff(["--cached", "--diff-filter=D", "--name-only"]))
+                .split("\n")
+                .filter(Boolean)
+        )
+        const nonDeletedStagedFiles = stagedFiles.difference(deletedFiles);
 
         /**
          Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
          */
-        const ignoredFiles = stagedFiles.filter(file => !this.shouldIncludeFile(file));
-        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.map(file => git.diff(["--cached", "--stat", file])))
+        const ignoredFiles = new Set(nonDeletedStagedFiles.values()
+            .filter(file => !this.shouldIncludeFile(file))
+            .toArray()
+        );
 
         /**
          * Files which are investigated further
          */
-        const includedFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
-        const includedBlankLinesDiffs = await Promise.all(includedFiles.map(async file => ({
+        const includedFiles = nonDeletedStagedFiles.difference(ignoredFiles)
+
+        const includedBlankLinesDiffs = await Promise.all([...includedFiles].map(async file => ({
             diff: await git.diff(["--cached", "-w", "--ignore-blank-lines", file]),
             file
         })))
 
-        // filter out files which have no syntactical changes
-        const relevantDiffs = includedBlankLinesDiffs.filter(item => item.diff.trim() !== "")
-        const nonSyntacticalDiffs = includedBlankLinesDiffs.filter(item => item.diff.trim() === "")
-
-        // if there are just spaces as changes, we should not generate a commit message just based on the file name
-        if (relevantDiffs.length === 0) {
-            // TODO wrap in fitDiffsInLLM function
-            return `The following files have no syntactic changes:\n${nonSyntacticalDiffs.map(item => item.file).join(", ")}`
+        const relevantFiles = new Set<string>()
+        const nonSyntacticChangesFiles = new Set<string>()
+        for (const { diff, file } of includedBlankLinesDiffs) {
+            if (diff.trim() === "") {
+                nonSyntacticChangesFiles.add(file)
+            } else {
+                relevantFiles.add(file)
+            }
         }
 
-        return fitDiffsWithinTokenLimit([
-            relevantDiffs.map(item => item.diff),
-            [
-                "The following files have no syntactic changes:\n",
-                ...nonSyntacticalDiffs.map(item => item.file)
-            ],
-            [
-                "The following files are ignored because they are likely to be generated or lock files:\n",
-                ...ignoredFilesDiffStats,
+        return {
+            deletedFiles,
+            ignoredFiles,
+            nonSyntacticChangesFiles,
+            relevantFiles,
+        }
+    }
+
+    async getDiff(remainingTokens: number) {
+        const INCLUDE_MAXIMAL_FILE_COUNT = 5;
+        const git = simpleGit();
+        const { deletedFiles, ignoredFiles, nonSyntacticChangesFiles, relevantFiles } = await this.diffFilesPerType()
+
+        const messageParts: string[][] = []
+        if (relevantFiles.size > 0) {
+            const relevantDiffs = await Promise.all(relevantFiles.values().map(file => git.diff(["--cached", "-w", "--ignore-blank-lines", file])))
+            const filteredDiffs = relevantDiffs.map((diff, index) => `${"\n".repeat(Math.min(1, index))}${this.filterDiffForLLM(diff)}`)
+            messageParts.push([
+                "Diffs:",
+                ...filteredDiffs
+            ])
+        }
+
+        if (deletedFiles.size > 0) {
+            const message = [
+                "\n\nFiles which got deleted:",
+                ...deletedFiles.values().toArray(),
             ]
-        ], remainingTokens)
-            .join("\n")
+
+            messageParts.push(message)
+        }
+
+        if (nonSyntacticChangesFiles.size > 0) {
+            const nonSyntacticalDiffs = await Promise.all(nonSyntacticChangesFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff(["--cached", file])))
+            const message = [
+                "\n\nFiles with non syntactic changes:",
+                nonSyntacticalDiffs.join("\n")
+            ]
+
+            if (nonSyntacticChangesFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
+                message.push(`...and ${nonSyntacticChangesFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
+            }
+
+            messageParts.push(message)
+        }
+
+        if (ignoredFiles.size > 0) {
+            const ignoredFilesDiffStats = await Promise.all(ignoredFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff(["--cached", "--stat", file])))
+            const message = [
+                "\n\nFiles that are ignored because they are likely to be generated or lock files:",
+                ignoredFilesDiffStats.join("\n"),
+            ]
+
+            if (ignoredFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
+                message.push(`...and ${ignoredFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
+            }
+
+            messageParts.push(message)
+        }
+
+        return fitDiffsWithinTokenLimit(messageParts, remainingTokens).join("\n").trim()
     }
 
     async run(): Promise<void> {
@@ -186,7 +252,7 @@ export default class AutoCommitCommand extends Command {
         return [
             {
                 content:
-                    "You are an assistant that generates concise, clear Git commit messages. Only output the commit message itself and never ask any questions. If the user provides non useful instructions, only depend on the staged files and the current branch.",
+                    "You are an assistant that generates concise, clear Git commit messages. Always answer with the output of the commit message itself and never ask any questions. If the user provides non useful instructions, only depend on the staged files and the current branch.",
                 role: "system",
             },
             {
@@ -326,10 +392,10 @@ Diffs of Staged Files:
 
         const decision = await renderSelectInput({
             items: [
-                { label: "✅ Accept and commit", value: "accept" },
-                { label: "✍️ Edit manually", value: "edit" },
-                { label: "🔁 Provide feedback", value: "feedback" },
-                { label: "❌ Cancel", value: "cancel" },
+                { label: "\u{1F680} Accept and commit", value: "accept" },
+                { label: "\u{21AA} Edit manually", value: "edit" },
+                { label: "\u{1F501} Provide feedback", value: "feedback" },
+                { label: "\u{1F6AB} Cancel", value: "cancel" },
             ] as const,
             message: "What would you like to do?",
         })
@@ -349,8 +415,11 @@ Diffs of Staged Files:
             case "edit": {
                 const [firstLine, rest] = this.transformGeneratedCommitMessage(commitMessage);
                 const result = await renderCommitMessageInput({
-                    description: rest.split("\n"),
-                    message: firstLine
+                    defaultValues: {
+                        description: rest?.split("\n") || [],
+                        message: firstLine
+                    },
+                    message: "Manually edit the commit message:"
                 });
 
                 if (result === null) {
@@ -366,30 +435,38 @@ Diffs of Staged Files:
             case "feedback": {
                 const feedback = await renderTextInput({
                     message: "Provide your feedback for the LLM:",
+                    validate(input) {
+                        if(input.trim() === "") {
+                            return "Feedback cannot be empty."
+                        }
+
+                        return true;
+                    }
                 });
 
-                if (!feedback) {
-                    LOGGER.fatal(this, "No feedback received from TextBox.");
+                if (feedback === null) {
+                    this.exit(SIGINT_ERROR_NUMBER)
                 }
 
                 chat.addMessage(feedback, "user");
                 return false;
             }
 
-            default: {
-                return true;
+            // means user pressed ctrl+c
+            case null: {
+                this.exit(SIGINT_ERROR_NUMBER);
             }
         }
     }
 
-    private transformGeneratedCommitMessage(commitMessage: string) {
+    private transformGeneratedCommitMessage(commitMessage: string): [string, string] | [string] {
         const indexOfLineBreak = commitMessage.indexOf("\n");
         if (indexOfLineBreak === -1) {
-            return commitMessage;
+            return [commitMessage];
         }
 
-        const firstLine = commitMessage.slice(0, Math.max(0, indexOfLineBreak)).trim();
-        const rest = commitMessage.slice(Math.max(0, indexOfLineBreak + 1)).trim();
+        const firstLine = commitMessage.slice(0, indexOfLineBreak).trim();
+        const rest = commitMessage.slice(indexOfLineBreak + 1).trim();
 
         return [firstLine, rest]
     }
