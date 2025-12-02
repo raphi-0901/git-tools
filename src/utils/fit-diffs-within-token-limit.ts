@@ -28,14 +28,14 @@ export function fitDiffsWithinTokenLimit(diffGroups: string[][], maxTokens: numb
         for (const [diffIndex, { diffText, originalIndex }] of section.entries()) {
             const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
 
-            console.log('---------------------------------------');
-            console.log('fitsWithinLimit :>>', fitsWithinLimit);
-            console.log('tokensLeft :>>', tokensLeft);
-            console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
+            // console.log('---------------------------------------');
+            // console.log('fitsWithinLimit :>>', fitsWithinLimit);
+            // console.log('tokensLeft :>>', tokensLeft);
+            // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
 
             if (fitsWithinLimit === false) {
-                const tokenCount = encode(diffText).length;
-                console.log('tokenCount :>>', tokenCount);
+                // const tokenCount = encode(diffText).length;
+                // console.log('tokenCount :>>', tokenCount);
 
                 // TODO: consider trimming equally from start and end while preserving diff headers
                 const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
@@ -46,7 +46,7 @@ export function fitDiffsWithinTokenLimit(diffGroups: string[][], maxTokens: numb
                 tokensLeft -= fitsWithinLimit;
             }
 
-            console.log('---------------------------------------');
+            // console.log('---------------------------------------');
 
             const remainingDiffs = section.length - 1 - diffIndex;
             if (remainingDiffs > 0) {
