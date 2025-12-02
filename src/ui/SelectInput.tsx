@@ -1,4 +1,4 @@
-import { Text, useInput } from "ink";
+import { useInput } from "ink";
 import SelectInput from "ink-select-input";
 import React, { useEffect, useState } from "react";
 
@@ -17,7 +17,7 @@ function SelectInputWithCancel<T>({
                                       cancel,
                                       items,
                                       message,
-                                        submit
+                                      submit
                                   }: {
     cancel: () => void;
     items: SelectInputItem<T>[];
