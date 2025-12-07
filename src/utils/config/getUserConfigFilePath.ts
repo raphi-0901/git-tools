@@ -19,7 +19,6 @@ export async function getUserConfigFilePath(ctx: Command, params: ConfigurationF
         }
     }
 
-    // 2. Error if not found
     if (!configPath) {
         const checkedFileNames = configFileNames.map(configFileName => `\t- ${configFileName}`).join("\n");
         LOGGER.debug(ctx, `Could not find a configuration file in directory: ${terminalLink(params.rootDir, `file://${params.rootDir}`)}.\n` +

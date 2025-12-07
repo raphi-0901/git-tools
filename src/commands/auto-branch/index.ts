@@ -10,13 +10,14 @@ import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.j
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
-import { createSpinner } from "../../utils/create-spinner.js";
-import { gatherAutoBranchConfigForHostname } from "../../utils/gather-auto-branch-config.js";
+import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
+import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";
+import { createSpinner } from "../../utils/spinner.js";
 import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
@@ -50,10 +51,13 @@ export default class AutoBranchCommand extends Command {
             return;
         }
 
+        LOGGER.error(this, error as string)
+
         this.log(chalk.red("🚫 Branch creation cancelled."));
     }
 
     async run() {
+
         const { args, flags } = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
 
@@ -63,10 +67,15 @@ export default class AutoBranchCommand extends Command {
 
         const issueUrl = new URL(args.issueUrl);
         const { hostname } = issueUrl;
-        const { askForSavingSettings, finalGroqApiKey, finalServiceConfigOfHostname } = await this.getFinalConfig(hostname)
-        await isOnline(this)
 
-        this.spinner.text = "Analyzing issue for branch name generation...\n"
+        const finalConfig = await this.getFinalConfig(hostname);
+        const { askForSavingSettings, finalServiceConfigOfHostname } = finalConfig
+        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
+
+        await isOnline(this)
+        const { groqApiKey: finalGroqApiKey, remainingTokensForLLM } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
+
+        this.spinner.text = "Analyzing issue for branch name generation..."
         this.spinner.start();
 
         const service = getService(finalServiceConfigOfHostname.type, finalServiceConfigOfHostname);

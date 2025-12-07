@@ -1,20 +1,9 @@
-import { Command } from "@oclif/core";
 import chalk from "chalk";
-import { Spinner } from "yocto-spinner";
 import * as z from "zod";
 
+import { ExtendedCommand } from "../types/ExtendedCommand.js";
 import { FATAL_ERROR_NUMBER } from "./constants.js";
-
-type ExtendedCommand = Command & {
-    // debug?: boolean
-    spinner?: Spinner
-};
-
-function stopSpinner(ctx: ExtendedCommand) {
-    if(ctx.spinner && ctx.spinner.isSpinning) {
-        ctx.spinner.stop();
-    }
-}
+import { stopSpinner } from "./spinner.js";
 
 /**
  * Info logs (normal operation).

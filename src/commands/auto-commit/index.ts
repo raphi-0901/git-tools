@@ -1,22 +1,23 @@
 import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
-import { AuthenticationError } from "openai/core/error";
 import { simpleGit } from "simple-git";
 
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
+import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { promptForCommitMessageConfigValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
-import { createSpinner } from "../../utils/create-spinner.js";
 import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
 import { countTokens } from "../../utils/gpt-tokenizer.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
-import { promptForValue } from "../../utils/prompt-for-value.js";
+import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
+import { createSpinner } from "../../utils/spinner.js";
 import {
     AutoCommitConfigSchema,
     AutoCommitUpdateConfig
@@ -168,6 +169,7 @@ export default class AutoCommitCommand extends Command {
 
     async run() {
         const { flags } = await this.parse(AutoCommitCommand);
+        await checkIfInGitRepository(this);
 
         const filesStaged = await checkIfFilesStaged();
         if (!filesStaged) {
@@ -175,59 +177,19 @@ export default class AutoCommitCommand extends Command {
         }
 
         const finalConfig = await this.getFinalConfig(flags);
-
-
         const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
-        let groqApiKey = finalConfig.finalGroqApiKey;
-
         LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
-
         await isOnline(this)
-
-        let chat = new LLMChat(groqApiKey);
-        let remainingTokensForLLM = 0;
-
-        this.spinner.text = `Checking validity of GROQ API key...`
-        while (true) {
-            try {
-                this.spinner.start();
-                remainingTokensForLLM = await chat.getRemainingTokens();
-                this.spinner.stop();
-                LOGGER.debug(this, `Remaining tokens for LLM: ${remainingTokensForLLM}`)
-                break;
-            } catch (error) {
-                // wait a bit before retrying
-                await new Promise(resolve => {setTimeout(resolve, 1000)});
-                this.spinner.stop();
-
-                if (error instanceof AuthenticationError && error.status === 401) {
-                    LOGGER.warn(this, "Your GROQ_API_KEY is invalid. Please provide a new one.");
-
-                    const newKey = await promptForValue({
-                        key: "GROQ_API_KEY",
-                        schema: AutoCommitConfigSchema.shape.GROQ_API_KEY
-                    });
-
-                    if (!newKey) {
-                        this.exit(SIGINT_ERROR_NUMBER);
-                    }
-
-                    groqApiKey = newKey;
-                    chat = new LLMChat(groqApiKey);
-                } else {
-                    LOGGER.fatal(this, `Unexpected error while checking tokens: ${error}`);
-                }
-            }
-        }
+        const { groqApiKey: finalGroqApiKey, remainingTokensForLLM } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
 
         this.spinner.text = "Analyzing staged files for commit message generation..."
-        const finalGroqApiKey = groqApiKey;
+        this.spinner.start()
+
         const initialMessages = await this.buildInitialMessages({
             examples: finalExamples,
             instructions: finalInstructions
         })
-
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
@@ -243,7 +205,7 @@ export default class AutoCommitCommand extends Command {
             role: "user",
         })
 
-        chat = new LLMChat(finalGroqApiKey, initialMessages)
+        const chat = new LLMChat(finalGroqApiKey, initialMessages)
 
         let finished = false;
         let commitMessage = "";
@@ -395,35 +357,22 @@ Diffs of Staged Files:
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
+            finalGroqApiKey = await promptForTextConfigValue(this, {
+                schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
 
-            const promptedGroqApiKey = await promptForValue({
-                key: 'GROQ_API_KEY',
-                schema: AutoCommitConfigSchema.shape.GROQ_API_KEY
-            })
+            });
 
-            if (promptedGroqApiKey === null) {
-                this.exit(SIGINT_ERROR_NUMBER)
-            }
-
-            finalGroqApiKey = promptedGroqApiKey;
             askForSavingSettings = true;
         }
 
         let finalInstructions = flags.instructions ?? userConfig.INSTRUCTIONS;
         if (!finalInstructions) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
-
-            const promptedFinalInstructions = await promptForValue({
+            finalInstructions = await promptForTextConfigValue(this, {
                 currentValue: "Keep it short and conventional",
-                key: 'INSTRUCTIONS',
                 schema: AutoCommitConfigSchema.shape.INSTRUCTIONS
             })
 
-            if (promptedFinalInstructions === null) {
-                this.exit(SIGINT_ERROR_NUMBER)
-            }
-
-            finalInstructions = promptedFinalInstructions
             askForSavingSettings = true;
         }
 
@@ -432,16 +381,10 @@ Diffs of Staged Files:
             LOGGER.warn(this, "No EXAMPLES set in your config.");
 
             const examples = []
-
             while(true) {
-                const result = await renderCommitMessageInput({
+                const result = await promptForCommitMessageConfigValue(this, {
                     message: "Provide some examples of commit messages you would like to generate: (leave empty if you don't want to provide any further examples)"
-                });
-
-                if (result === null) {
-                    this.exit(SIGINT_ERROR_NUMBER)
-                }
-
+                })
 
                 if(result.message.trim() === "" && result?.description.join(',').trim() === "") {
                     break;

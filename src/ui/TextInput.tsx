@@ -1,4 +1,4 @@
-import { Text, useInput } from "ink";
+import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import React, { useEffect, useState } from "react";
 
@@ -70,8 +70,9 @@ function TextInputWithCancel({
     }
 
     return (
-        <>
+        <Box>
             {renderQuestion(message)}
+            <Text>{" "}</Text>
             <TextInput
                 focus={true}
                 onChange={setInputValue}
@@ -79,7 +80,7 @@ function TextInputWithCancel({
                 value={inputValue}
             />
             {validationMessage && <Text color="red">{validationMessage}</Text>}
-        </>
+        </Box>
     );
 }
 
