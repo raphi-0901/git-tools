@@ -1,4 +1,3 @@
-import { input } from "@inquirer/prompts";
 import * as z from "zod";
 
 import { renderTextInput } from "../ui/TextInput.js";
@@ -9,13 +8,13 @@ export async function promptForValue<T>({
                                      key,
                                      schema
                                  }: {
-    currentValue?: T;
+    currentValue?: string;
     customMessage?: string;
     key: string;
     schema: z.ZodSchema<T>;
 }) {
     return renderTextInput({
-        defaultValue: currentValue as string | undefined,
+        defaultValue: currentValue,
         message: customMessage || `Enter a value for "${key}" (leave empty to unset):`,
         validate(value) {
             const parsed = schema.safeParse(value);

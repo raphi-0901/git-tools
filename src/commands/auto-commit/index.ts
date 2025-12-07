@@ -1,43 +1,45 @@
 import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
+import { AuthenticationError } from "openai/core/error";
 import { simpleGit } from "simple-git";
 
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
+import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
+import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
-import { getRemainingTokensOfLLMChat } from "../../utils/get-remaining-token-of-llm-chat.js";
 import { countTokens } from "../../utils/gpt-tokenizer.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";
-import { saveGatheredSettings } from "../../utils/save-gathered-settings.js";
-import { loadMergedUserConfig } from "../../utils/user-config.js";
-import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema/auto-commit-config.js";
+import {
+    AutoCommitConfigSchema,
+    AutoCommitUpdateConfig
+} from "../../zod-schema/auto-commit-config.js";
 
 type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
 
 export default class AutoCommitCommand extends Command {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
+        debug: Flags.boolean({
+            description: "Show debug logs.",
+        }),
         instructions: Flags.string({
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
-        }),
-        stripDiff: Flags.boolean({
-            char: "s",
-            description: "Strips diffs.",
         }),
     };
     public readonly commandId = "auto-commit";
     public readonly spinner = createSpinner();
 
     async catch(error: unknown) {
-        LOGGER.error(this, error as string)
+        LOGGER.debug(this, error as string)
 
         // skip errors already logged by LOGGER.fatal
         if (error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
@@ -164,7 +166,7 @@ export default class AutoCommitCommand extends Command {
         return fitDiffsWithinTokenLimit(messageParts, remainingTokens).join("\n").trim()
     }
 
-    async run(): Promise<void> {
+    async run() {
         const { flags } = await this.parse(AutoCommitCommand);
 
         const filesStaged = await checkIfFilesStaged();
@@ -172,38 +174,88 @@ export default class AutoCommitCommand extends Command {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
 
-        const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
+        const finalConfig = await this.getFinalConfig(flags);
+
+
+        const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
+        let groqApiKey = finalConfig.finalGroqApiKey;
+
+        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
+
+
         await isOnline(this)
 
+        let chat = new LLMChat(groqApiKey);
+        let remainingTokensForLLM = 0;
+
+        this.spinner.text = `Checking validity of GROQ API key...`
+        while (true) {
+            try {
+                this.spinner.start();
+                remainingTokensForLLM = await chat.getRemainingTokens();
+                this.spinner.stop();
+                LOGGER.debug(this, `Remaining tokens for LLM: ${remainingTokensForLLM}`)
+                break;
+            } catch (error) {
+                // wait a bit before retrying
+                await new Promise(resolve => {setTimeout(resolve, 1000)});
+                this.spinner.stop();
+
+                if (error instanceof AuthenticationError && error.status === 401) {
+                    LOGGER.warn(this, "Your GROQ_API_KEY is invalid. Please provide a new one.");
+
+                    const newKey = await promptForValue({
+                        key: "GROQ_API_KEY",
+                        schema: AutoCommitConfigSchema.shape.GROQ_API_KEY
+                    });
+
+                    if (!newKey) {
+                        this.exit(SIGINT_ERROR_NUMBER);
+                    }
+
+                    groqApiKey = newKey;
+                    chat = new LLMChat(groqApiKey);
+                } else {
+                    LOGGER.fatal(this, `Unexpected error while checking tokens: ${error}`);
+                }
+            }
+        }
+
         this.spinner.text = "Analyzing staged files for commit message generation..."
-        this.spinner.start();
+        const finalGroqApiKey = groqApiKey;
+        const initialMessages = await this.buildInitialMessages({
+            examples: finalExamples,
+            instructions: finalInstructions
+        })
 
-        const remainingTokensForLLM = await getRemainingTokensOfLLMChat({
-            apiKey: finalGroqApiKey,
-        });
-
-        const initialMessages = await this.buildInitialMessages(finalInstructions)
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         const tokensOfInitialMessages = countTokens(initialMessages)
+        LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
 
         // fit diff into token limit
         const diff = await this.getDiff(remainingTokensForLLM - tokensOfInitialMessages);
+        LOGGER.debug(this, `Diff takes ${countTokens(diff)} tokens: ${diff}`)
 
         initialMessages.push({
             content: diff,
             role: "user",
         })
 
-        const chat = new LLMChat(finalGroqApiKey, initialMessages);
+        chat = new LLMChat(finalGroqApiKey, initialMessages)
 
         let finished = false;
         let commitMessage = "";
         while (!finished) {
             this.spinner.text = "Generating commit message from staged files...";
             this.spinner.start()
-            commitMessage = await chat.generate();
+
+            try {
+                commitMessage = await chat.generate();
+            } catch (error) {
+                LOGGER.fatal(this, "Error while generating commit message: " + error)
+            }
 
             this.spinner.stop()
 
@@ -219,6 +271,7 @@ export default class AutoCommitCommand extends Command {
         }
 
         await saveGatheredSettings(this, this.commandId, {
+            EXAMPLES: finalExamples,
             GROQ_API_KEY: finalGroqApiKey,
             INSTRUCTIONS: finalInstructions,
         })
@@ -244,7 +297,13 @@ export default class AutoCommitCommand extends Command {
         });
     }
 
-    private async buildInitialMessages(instructions: string) {
+    private async buildInitialMessages({
+                                           examples,
+                                           instructions
+                                       }: {
+        examples: string[],
+        instructions: string,
+    }) {
         const git = simpleGit();
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
@@ -260,6 +319,8 @@ export default class AutoCommitCommand extends Command {
 Create a commit message using the following instructions and information.
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
+Examples of good Commit Messages: ${examples.join("\n")}
+ 
 Diffs of Staged Files:
                 `,
                 role: "user",
@@ -328,20 +389,6 @@ Diffs of Staged Files:
     }
 
     private async getFinalConfig(flags: AutoCommitFlags) {
-        // const finalConfig: AutoCommitUpdateConfig = {}
-        // let askForSavingSettings = false;
-        // for (const [key, fieldSchema] of Object.entries(AutoCommitConfigSchema.shape)) {
-        //     let currentValue = userConfig[key as keyof AutoCommitUpdateConfig]
-        //     if(!currentValue) {
-        //         currentValue = await promptForValue({
-        //             key,
-        //             schema: fieldSchema,
-        //         })
-        //         askForSavingSettings = true;
-        //     }
-        //
-        //     finalConfig[key as keyof AutoCommitUpdateConfig] = currentValue
-        // }
         const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this, this.commandId);
 
         let askForSavingSettings = false;
@@ -353,8 +400,9 @@ Diffs of Staged Files:
                 key: 'GROQ_API_KEY',
                 schema: AutoCommitConfigSchema.shape.GROQ_API_KEY
             })
-            if (!promptedGroqApiKey) {
-                LOGGER.fatal(this, "No GROQ_API_KEY received from TextBox.");
+
+            if (promptedGroqApiKey === null) {
+                this.exit(SIGINT_ERROR_NUMBER)
             }
 
             finalGroqApiKey = promptedGroqApiKey;
@@ -370,16 +418,47 @@ Diffs of Staged Files:
                 key: 'INSTRUCTIONS',
                 schema: AutoCommitConfigSchema.shape.INSTRUCTIONS
             })
-            if (!promptedFinalInstructions) {
-                LOGGER.fatal(this, "No GROQ_API_KEY received from TextBox.");
+
+            if (promptedFinalInstructions === null) {
+                this.exit(SIGINT_ERROR_NUMBER)
             }
 
             finalInstructions = promptedFinalInstructions
             askForSavingSettings = true;
         }
 
+        let finalExamples = userConfig.EXAMPLES;
+        if (!finalExamples) {
+            LOGGER.warn(this, "No EXAMPLES set in your config.");
+
+            const examples = []
+
+            while(true) {
+                const result = await renderCommitMessageInput({
+                    message: "Provide some examples of commit messages you would like to generate: (leave empty if you don't want to provide any further examples)"
+                });
+
+                if (result === null) {
+                    this.exit(SIGINT_ERROR_NUMBER)
+                }
+
+
+                if(result.message.trim() === "" && result?.description.join(',').trim() === "") {
+                    break;
+                }
+
+                const example = `${result?.message}\n${result?.description.join("\n")}`
+                examples.push(example)
+            }
+
+            finalExamples = examples
+            askForSavingSettings = true;
+        }
+
+
         return {
             askForSavingSettings,
+            finalExamples,
             finalGroqApiKey,
             finalInstructions,
         }
@@ -436,7 +515,7 @@ Diffs of Staged Files:
                 const feedback = await renderTextInput({
                     message: "Provide your feedback for the LLM:",
                     validate(input) {
-                        if(input.trim() === "") {
+                        if (input.trim() === "") {
                             return "Feedback cannot be empty."
                         }
 

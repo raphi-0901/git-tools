@@ -5,9 +5,12 @@ import * as z from "zod";
 
 import { FATAL_ERROR_NUMBER } from "./constants.js";
 
-type CommandWithSpinner = Command & { spinner?: Spinner };
+type ExtendedCommand = Command & {
+    // debug?: boolean
+    spinner?: Spinner
+};
 
-function stopSpinner(ctx: CommandWithSpinner) {
+function stopSpinner(ctx: ExtendedCommand) {
     if(ctx.spinner && ctx.spinner.isSpinning) {
         ctx.spinner.stop();
     }
@@ -16,7 +19,7 @@ function stopSpinner(ctx: CommandWithSpinner) {
 /**
  * Info logs (normal operation).
  */
-export function log(ctx: CommandWithSpinner, message: string): void {
+export function log(ctx: ExtendedCommand, message: string): void {
     stopSpinner(ctx)
     ctx.log(`${chalk.cyan.bold("ℹ️  INFO:")} ${message}`);
 }
@@ -24,7 +27,7 @@ export function log(ctx: CommandWithSpinner, message: string): void {
 /**
  * Warning logs (something might be wrong).
  */
-export function warn(ctx: CommandWithSpinner, message: string): void {
+export function warn(ctx: ExtendedCommand, message: string): void {
     stopSpinner(ctx)
     ctx.log(`${chalk.yellow.bold("⚠️  WARN:")} ${chalk.yellow(message)}`);
 }
@@ -32,7 +35,7 @@ export function warn(ctx: CommandWithSpinner, message: string): void {
 /**
  * Error logs (non-fatal, execution continues).
  */
-export function error(ctx: CommandWithSpinner, message: string): void {
+export function error(ctx: ExtendedCommand, message: string): void {
     stopSpinner(ctx)
     ctx.log(`${chalk.red.bold("❌ ERROR:")} ${chalk.red(message)}`);
 }
@@ -40,13 +43,26 @@ export function error(ctx: CommandWithSpinner, message: string): void {
 /**
  * Fatal error logs (terminates command, never returns).
  */
-export function fatal(ctx: CommandWithSpinner, message: string): never {
+export function fatal(ctx: ExtendedCommand, message: string): never {
     stopSpinner(ctx)
     ctx.log(`${chalk.red.bold("💥 FATAL:")} ${chalk.red(message)}`);
     return ctx.exit(FATAL_ERROR_NUMBER);
 }
 
-export function zodError(ctx: CommandWithSpinner, error: z.ZodError) {
+/**
+ * Debug logs (only shown when the `--debug` flag is set).
+ */
+export function debug(ctx: ExtendedCommand, message: string) {
+    if(!ctx.argv.includes('--debug')) {
+        return;
+    }
+
+    stopSpinner(ctx)
+
+    ctx.log(`${chalk.blue.bold("\u{1F50D} DEBUG:")} ${chalk.gray(message)}`);
+}
+
+export function zodError(ctx: ExtendedCommand, error: z.ZodError) {
     stopSpinner(ctx)
 
     const message = error.issues

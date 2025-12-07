@@ -7,6 +7,8 @@ import { IssueSummary } from "../../types/issue-summary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
+import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gather-auto-branch-config.js";
@@ -15,8 +17,6 @@ import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { promptForValue } from "../../utils/prompt-for-value.js";
-import { saveGatheredSettings } from "../../utils/save-gathered-settings.js";
-import { loadMergedUserConfig } from "../../utils/user-config.js";
 import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
@@ -33,9 +33,12 @@ export default class AutoBranchCommand extends Command {
     };
     static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
     static flags = {
-            instructions: Flags.string({
+            debug: Flags.boolean({
+            description: "Show debug logs.",
+        }),
+        instructions: Flags.string({
             char: "i",
-            description: "Provide a specific instruction to the model for the commit message",
+            description: "Provide a specific instruction to the model for the branch generation.",
         }),
     };
     public readonly commandId = "auto-branch";

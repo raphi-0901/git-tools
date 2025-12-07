@@ -1,6 +1,6 @@
 import * as OpenAI from "openai";
 
-import { GROQ_BASE_URL, STANDARD_LLM_MODEL } from "./constants.js";
+import { GROQ_BASE_URL, MAX_TOKENS, STANDARD_LLM_MODEL } from "./constants.js";
 
 export type ChatMessage = OpenAI.OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -23,7 +23,7 @@ export class LLMChat {
     /**
      * Generate a completion from the current chat history.
      */
-    async generate(model = STANDARD_LLM_MODEL, temperature = 0.4): Promise<string> {
+    async generate(model = STANDARD_LLM_MODEL, temperature = 0.4) {
         const response = await this.client.chat.completions.create({
             messages: this.messages,
             model,
@@ -43,6 +43,21 @@ export class LLMChat {
      */
     getMessages() {
         return [...this.messages];
+    }
+
+    /**
+     * Get Rate Limit Token Info for this client.
+     */
+    async getRemainingTokens(model = STANDARD_LLM_MODEL) {
+        const response = await this.client.responses
+            .create({ input: "ping", model })
+            .withResponse();
+
+        return (
+            Number(
+                response.response.headers.get("x-ratelimit-remaining-tokens")
+            ) || MAX_TOKENS
+        );
     }
 
     /**
