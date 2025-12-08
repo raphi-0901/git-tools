@@ -1,7 +1,7 @@
 import { Command } from "@oclif/core";
 import * as z from "zod";
 
-import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
+import { FormValues, renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { SIGINT_ERROR_NUMBER } from "../constants.js";
 
@@ -12,6 +12,7 @@ type TextParams = {
 }
 
 type CommitMessageParams = {
+    defaultValues?: FormValues,
     message: string;
 }
 
@@ -29,8 +30,9 @@ export async function promptForTextConfigValue(ctx: Command, { currentValue, cus
     return promptedFinalValue
 }
 
-export async function promptForCommitMessageConfigValue(ctx: Command, { message }: CommitMessageParams) {
+export async function promptForCommitMessageValue(ctx: Command, { defaultValues, message }: CommitMessageParams) {
     const result = await renderCommitMessageInput({
+        defaultValues,
         message
     });
 
