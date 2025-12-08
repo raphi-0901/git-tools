@@ -7,6 +7,7 @@ import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
 import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
 import { promptForCommitMessageValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
@@ -59,9 +60,16 @@ export default class AutoCommitCommand extends Command {
         const { flags } = await this.parse(AutoCommitCommand);
         await checkIfInGitRepository(this);
 
-        const filesStaged = await checkIfFilesStaged();
-        if (!filesStaged) {
-            LOGGER.fatal(this, "No staged files to create a commit message.");
+        if(flags.reword) {
+            const commitExists = await checkIfCommitExists(flags.reword);
+            if(!commitExists) {
+                LOGGER.fatal(this, `Commit with hash ${flags.reword} does not exist.`);
+            }
+        } else {
+            const filesStaged = await checkIfFilesStaged();
+            if (!filesStaged) {
+                LOGGER.fatal(this, "No staged files to create a commit message.");
+            }
         }
 
         const finalConfig = await this.getFinalConfig(flags);
@@ -83,7 +91,6 @@ export default class AutoCommitCommand extends Command {
         // @ts-expect-error
         const tokensOfInitialMessages = countTokens(initialMessages)
         LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
-
 
         const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
         const diffAnalyzerParams: DiffAnalyzerParams = {

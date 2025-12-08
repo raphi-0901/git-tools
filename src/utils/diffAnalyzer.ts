@@ -2,68 +2,83 @@ import { simpleGit } from "simple-git";
 
 import { decode, encode, isWithinTokenLimit } from "./gpt-tokenizer.js";
 
-async function diffFilesPerType(checkAgainst: string) {
+async function diffFilesPerType(params: DiffAnalyzerParams) {
     const git = simpleGit();
 
+    const isStaged = params.type === "commit";
 
-    const stagedFiles = new Set(
-        (await git.diff([checkAgainst, "--name-only"]))
-            .split("\n")
-            .filter(Boolean)
-    )
+    const baseArgs = isStaged
+        ? ["diff", "--cached"]
+        : ["show", params.commitHash];
 
-    // should never happen, but just in case
-    if (stagedFiles.size === 0) {
+    // 1) get all changed files + status in one call
+    const nameStatus = await git.raw([
+        ...baseArgs,
+        "--name-status",
+        "--pretty=",
+    ]);
+
+    const changedFiles = new Set<string>();
+    const deletedFiles = new Set<string>();
+
+    for (const line of nameStatus.split("\n").filter(Boolean)) {
+        const [status, name] = line.trim().split(/\s+/);
+        if (!name) {
+            continue;
+        }
+
+        if (status === "D") {
+            deletedFiles.add(name);
+        } else {
+            changedFiles.add(name);
+        }
+    }
+
+    if (changedFiles.size === 0) {
         return {
-            deletedFiles: new Set<string>(),
+            deletedFiles,
             ignoredFiles: new Set<string>(),
             nonSyntacticChangesFiles: new Set<string>(),
-            relevantFiles: new Set<string>(),
+            relevantDiffs: new Set<string>(),
         };
     }
 
-    const deletedFiles = new Set(
-        (await git.diff([checkAgainst, "--diff-filter=D", "--name-only"]))
-            .split("\n")
-            .filter(Boolean)
-    )
-    const nonDeletedStagedFiles = stagedFiles.difference(deletedFiles);
-
-    /**
-     Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
-     */
-    const ignoredFiles = new Set(nonDeletedStagedFiles.values()
-        .filter(file => !shouldIncludeFile(file))
-        .toArray()
-    );
-
-    /**
-     * Files which are investigated further
-     */
-    const includedFiles = nonDeletedStagedFiles.difference(ignoredFiles)
-
-    const includedBlankLinesDiffs = await Promise.all([...includedFiles].map(async file => ({
-        diff: await git.diff([checkAgainst, "-w", "--ignore-blank-lines", file]),
-        file
-    })))
-
-    const relevantFiles = new Set<string>()
+    const ignoredFilesStats = new Set<string>()
     const nonSyntacticChangesFiles = new Set<string>()
-    for (const { diff, file } of includedBlankLinesDiffs) {
+    const relevantDiffs = new Set<string>()
+
+    // Common args for diff content
+    const diffArgsCommon = ["-w", "--ignore-blank-lines"];
+
+    for (const file of changedFiles) {
+        if (!shouldIncludeFile(file)) {
+            const ignoredFileStats = await git.raw([...baseArgs, "--stat", file])
+            ignoredFilesStats.add(ignoredFileStats)
+            continue;
+        }
+
+        const diff = await git.raw(
+            isStaged
+                ? [...baseArgs, ...diffArgsCommon, "--", file]
+                : [...baseArgs, "--pretty=", ...diffArgsCommon, "--", file]
+        );
+
         if (diff.trim() === "") {
             nonSyntacticChangesFiles.add(file)
-        } else {
-            relevantFiles.add(file)
+            continue
         }
+
+        relevantDiffs.add(diff)
     }
 
     return {
         deletedFiles,
-        ignoredFiles,
+        ignoredFiles: ignoredFilesStats,
         nonSyntacticChangesFiles,
-        relevantFiles,
-    }
+        relevantDiffs,
+    };
 }
+
 
 export type DiffAnalyzerParams = {
     commitHash: string,
@@ -77,13 +92,11 @@ export type DiffAnalyzerParams = {
 export async function diffAnalyzer(params: DiffAnalyzerParams) {
     const INCLUDE_MAXIMAL_FILE_COUNT = 5;
     const git = simpleGit();
-    const checkAgainst = params.type === "commit" ? "--cached" : params.commitHash;
-    const { deletedFiles, ignoredFiles, nonSyntacticChangesFiles, relevantFiles } = await diffFilesPerType(checkAgainst)
+    const { deletedFiles, ignoredFiles, nonSyntacticChangesFiles, relevantDiffs } = await diffFilesPerType(params)
 
     const messageParts: string[][] = []
-    if (relevantFiles.size > 0) {
-        const relevantDiffs = await Promise.all(relevantFiles.values().map(file => git.diff([checkAgainst, "-w", "--ignore-blank-lines", file])))
-        const filteredDiffs = relevantDiffs.map((diff, index) => `${"\n".repeat(Math.min(1, index))}${filterDiffForLLM(diff)}`)
+    if (relevantDiffs.size > 0) {
+        const filteredDiffs = [...relevantDiffs].map((diff, index) => `${"\n".repeat(Math.min(1, index))}${filterDiffForLLM(diff)}`)
         messageParts.push([
             "Diffs:",
             ...filteredDiffs
@@ -100,10 +113,9 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
     }
 
     if (nonSyntacticChangesFiles.size > 0) {
-        const nonSyntacticalDiffs = await Promise.all(nonSyntacticChangesFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff([checkAgainst, file])))
         const message = [
             "\n\nFiles with non syntactic changes:",
-            nonSyntacticalDiffs.join("\n")
+            [...nonSyntacticChangesFiles].join("\n")
         ]
 
         if (nonSyntacticChangesFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
@@ -114,7 +126,7 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
     }
 
     if (ignoredFiles.size > 0) {
-        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff([checkAgainst, "--stat", file])))
+        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff([...checkAgainst, "--stat", file])))
         const message = [
             "\n\nFiles that are ignored because they are likely to be generated or lock files:",
             ignoredFilesDiffStats.join("\n"),
