@@ -2,10 +2,9 @@ import { AuthenticationError } from "openai/core/error";
 
 import { ExtendedCommand } from "../types/ExtendedCommand.js";
 import { GroqApiKeySchema } from "../zod-schema/groqApiKey.js";
-import { SIGINT_ERROR_NUMBER } from "./constants.js";
+import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { LLMChat } from "./llm-chat.js";
 import * as LOGGER from "./logging.js";
-import { promptForValue } from "./prompt-for-value.js";
 import { setSpinnerText, startSpinner, stopSpinner } from "./spinner.js";
 
 export async function obtainValidGroqApiKey(ctx: ExtendedCommand, initialGroqApiKey: string) {
@@ -32,16 +31,9 @@ export async function obtainValidGroqApiKey(ctx: ExtendedCommand, initialGroqApi
             if (error instanceof AuthenticationError && error.status === 401) {
                 LOGGER.warn(ctx, "Your GROQ_API_KEY is invalid. Please provide a new one.");
 
-                const newKey = await promptForValue({
-                    key: "GROQ_API_KEY",
+                groqApiKey = await promptForTextConfigValue(ctx, {
                     schema: GroqApiKeySchema
                 });
-
-                if (!newKey) {
-                    ctx.exit(SIGINT_ERROR_NUMBER);
-                }
-
-                groqApiKey = newKey;
                 chat = new LLMChat(groqApiKey);
             } else {
                 LOGGER.fatal(ctx, `Unexpected error while checking tokens: ${error}`);

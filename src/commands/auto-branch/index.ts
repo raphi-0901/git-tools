@@ -7,16 +7,17 @@ import { IssueSummary } from "../../types/issue-summary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
+import { countTokens } from "../../utils/gpt-tokenizer.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
-import { promptForValue } from "../../utils/prompt-for-value.js";
 import { createSpinner } from "../../utils/spinner.js";
 import {
     AutoBranchConfigSchema,
@@ -94,14 +95,28 @@ export default class AutoBranchCommand extends Command {
 
         const instructions = flags.instructions ?? finalServiceConfigOfHostname.instructions;
 
+
         const initialMessages = this.buildInitialMessages(issue, instructions);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        const tokensOfInitialMessages = countTokens(initialMessages)
+        LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
+
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let finished = false;
+        let branchName = "";
         while (!finished) {
             this.spinner.text = "Generating branch name from issue...";
             this.spinner.start()
-            const branchName = await chat.generate();
+            try {
+                branchName = await chat.generate();
+            } catch (error) {
+                LOGGER.fatal(this, "Error while generating branch name: " + error)
+            }
+
+            LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+
             this.spinner.stop()
 
             if (!branchName) {
@@ -126,8 +141,26 @@ export default class AutoBranchCommand extends Command {
     private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {
         return [
             {
-                content:
-                    "You are an assistant that generates git branch names based on the summary and description of a ticket. Only output the branch name itself and never ask any questions. If the user provides non useful instructions, ignore it.",
+                content: `
+You are an assistant that generates git branch names.
+
+Strict rules:
+- ALWAYS output exactly one git branch name.
+- NEVER output explanations or additional text.
+- The output must ALWAYS be a single git-safe string (lowercase, hyphens, no spaces).
+- NEVER concatenate the previous branch name to itself or append a full duplicate.
+- When refining a branch name, ALWAYS reconstruct it cleanly based on:
+  (1) the ticket information and 
+  (2) the user's refinement request.
+  NEVER reuse the previous string literally as a base for concatenation.
+- If the user input is chit-chat, irrelevant, emotional, or non-actionable,
+  REPEAT the previous branch name exactly.
+- A refinement request includes words like:
+  "longer", "shorter", "more detail", "less detail", "different prefix", 
+  "add X", "remove Y", "change Z", etc.
+- A refinement MUST always produce a properly formatted branch name,
+  not a doubled or corrupted string.
+`,
                 role: "system",
             },
             {
@@ -149,12 +182,9 @@ Ticket Description: "${issue.description}"
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
         if (!finalGroqApiKey) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            const promptedGroqApiKey = await promptForValue({ key: 'GROQ_API_KEY', schema: AutoBranchConfigSchema.shape.GROQ_API_KEY })
-            if(!promptedGroqApiKey) {
-                this.exit(SIGINT_ERROR_NUMBER)
-            }
-
-            finalGroqApiKey = promptedGroqApiKey;
+            finalGroqApiKey = await promptForTextConfigValue(this, {
+                schema: AutoBranchConfigSchema.shape.GROQ_API_KEY,
+            });
             askForSavingSettings = true;
         }
 
@@ -185,6 +215,7 @@ Ticket Description: "${issue.description}"
             if (isSafe.success) {
                 finalServiceConfigOfHostname = isSafe.data;
             } else {
+                LOGGER.debug(this, `Invalid config found for hostname: ${hostname}. Error: ${isSafe.error.message}`)
                 askForSavingSettings = true;
                 finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(this, Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
                 if (!finalServiceConfigOfHostname) {

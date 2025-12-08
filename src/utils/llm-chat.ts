@@ -5,12 +5,17 @@ import { GROQ_BASE_URL, MAX_TOKENS, STANDARD_LLM_MODEL } from "./constants.js";
 export type ChatMessage = OpenAI.OpenAI.Chat.ChatCompletionMessageParam;
 
 export class LLMChat {
+    private _remainingTokens: number = -1;
     private client: OpenAI.OpenAI;
     private messages: ChatMessage[];
 
     constructor(apiKey: string, initialMessages: ChatMessage[] = [], baseURL = GROQ_BASE_URL) {
         this.client = new OpenAI.OpenAI({ apiKey, baseURL });
         this.messages = [...initialMessages];
+    }
+
+    get remainingTokens() {
+        return this._remainingTokens;
     }
 
     /**
@@ -28,9 +33,11 @@ export class LLMChat {
             messages: this.messages,
             model,
             temperature,
-        });
+        }).withResponse();
 
-        const content = response.choices[0]?.message?.content?.trim() ?? "";
+        this._remainingTokens = this.getRemainingTokensFromHeader(response.response);
+
+        const content = response.data.choices[0]?.message?.content?.trim() ?? "";
         if (content) {
             this.messages.push({ content, role: "assistant" });
         }
@@ -53,11 +60,8 @@ export class LLMChat {
             .create({ input: "ping", model })
             .withResponse();
 
-        return (
-            Number(
-                response.response.headers.get("x-ratelimit-remaining-tokens")
-            ) || MAX_TOKENS
-        );
+        this._remainingTokens = this.getRemainingTokensFromHeader(response.response);
+        return this._remainingTokens;
     }
 
     /**
@@ -65,5 +69,10 @@ export class LLMChat {
      */
     reset(messages: ChatMessage[] = []) {
         this.messages = [...messages];
+    }
+
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
+    private getRemainingTokensFromHeader(response: Response) {
+        return Number(response.headers.get("x-ratelimit-remaining-tokens")) || MAX_TOKENS;
     }
 }

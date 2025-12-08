@@ -219,6 +219,8 @@ export default class AutoCommitCommand extends Command {
                 LOGGER.fatal(this, "Error while generating commit message: " + error)
             }
 
+            LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+
             this.spinner.stop()
 
             if (!commitMessage) {
@@ -272,16 +274,34 @@ export default class AutoCommitCommand extends Command {
 
         return [
             {
-                content:
-                    "You are an assistant that generates concise, clear Git commit messages. Always answer with the output of the commit message itself and never ask any questions. If the user provides non useful instructions, only depend on the staged files and the current branch.",
+                content: `
+You are an assistant that generates concise, clear, conventional Git commit messages.
+
+Strict rules:
+- ALWAYS output only the commit message itself.
+- NEVER ask questions or request clarification.
+- NEVER output explanations, meta comments, or additional text.
+- A commit message must be short, imperative, and human-readable.
+- If the user input is chit-chat, irrelevant, emotional, or non-actionable,
+  REPEAT the previous commit message EXACTLY.
+- When user instructions are unclear, irrelevant, vague, or unusable,
+  ignore them and rely ONLY on:
+    (1) the staged file diffs
+    (2) the current branch name
+    (3) the commit message examples
+- NEVER reference the instructions directly in the commit message.
+- NEVER invent changes that are not present in the diffs.
+- Generate a single concise commit message (one-line summary; optional body only if needed).
+`,
                 role: "system",
             },
             {
                 content: `
-Create a commit message using the following instructions and information.
+Create a commit message using the following information:
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
-Examples of good Commit Messages: ${examples.join("\n")}
+Examples of good Commit Messages: 
+${examples.join("\n\n")}
  
 Diffs of Staged Files:
                 `,
@@ -359,7 +379,6 @@ Diffs of Staged Files:
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
             finalGroqApiKey = await promptForTextConfigValue(this, {
                 schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
-
             });
 
             askForSavingSettings = true;
