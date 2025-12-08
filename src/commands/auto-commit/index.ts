@@ -7,17 +7,19 @@ import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
 import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
-import { promptForCommitMessageConfigValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
+import { promptForCommitMessageValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
-import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
+import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
 import { countTokens } from "../../utils/gpt-tokenizer.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
+import { rewordCommit } from "../../utils/rewordCommitMessage.js";
 import { createSpinner } from "../../utils/spinner.js";
+import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedCommitMessage.js";
 import {
     AutoCommitConfigSchema,
     AutoCommitUpdateConfig
@@ -35,6 +37,9 @@ export default class AutoCommitCommand extends Command {
             char: "i",
             description: "Provide a specific instruction to the model for the commit message",
         }),
+        reword: Flags.string({
+            description: "Rewords the commit message of the given commit. The commit hash must be provided.",
+        }),
     };
     public readonly commandId = "auto-commit";
     public readonly spinner = createSpinner();
@@ -48,123 +53,6 @@ export default class AutoCommitCommand extends Command {
         }
 
         this.log(chalk.red("🚫 Commit cancelled."));
-    }
-
-    async diffFilesPerType() {
-        const git = simpleGit();
-
-        const stagedFiles = new Set(
-            (await git.diff(["--cached", "--name-only"]))
-                .split("\n")
-                .filter(Boolean)
-        )
-
-        // should never happen, but just in case
-        if (stagedFiles.size === 0) {
-            return {
-                deletedFiles: new Set<string>(),
-                ignoredFiles: new Set<string>(),
-                nonSyntacticChangesFiles: new Set<string>(),
-                relevantFiles: new Set<string>(),
-            };
-        }
-
-        const deletedFiles = new Set(
-            (await git.diff(["--cached", "--diff-filter=D", "--name-only"]))
-                .split("\n")
-                .filter(Boolean)
-        )
-        const nonDeletedStagedFiles = stagedFiles.difference(deletedFiles);
-
-        /**
-         Files which have a pattern which is very likely to be relevant for the commit message, such as generated files, lock files, etc.
-         */
-        const ignoredFiles = new Set(nonDeletedStagedFiles.values()
-            .filter(file => !this.shouldIncludeFile(file))
-            .toArray()
-        );
-
-        /**
-         * Files which are investigated further
-         */
-        const includedFiles = nonDeletedStagedFiles.difference(ignoredFiles)
-
-        const includedBlankLinesDiffs = await Promise.all([...includedFiles].map(async file => ({
-            diff: await git.diff(["--cached", "-w", "--ignore-blank-lines", file]),
-            file
-        })))
-
-        const relevantFiles = new Set<string>()
-        const nonSyntacticChangesFiles = new Set<string>()
-        for (const { diff, file } of includedBlankLinesDiffs) {
-            if (diff.trim() === "") {
-                nonSyntacticChangesFiles.add(file)
-            } else {
-                relevantFiles.add(file)
-            }
-        }
-
-        return {
-            deletedFiles,
-            ignoredFiles,
-            nonSyntacticChangesFiles,
-            relevantFiles,
-        }
-    }
-
-    async getDiff(remainingTokens: number) {
-        const INCLUDE_MAXIMAL_FILE_COUNT = 5;
-        const git = simpleGit();
-        const { deletedFiles, ignoredFiles, nonSyntacticChangesFiles, relevantFiles } = await this.diffFilesPerType()
-
-        const messageParts: string[][] = []
-        if (relevantFiles.size > 0) {
-            const relevantDiffs = await Promise.all(relevantFiles.values().map(file => git.diff(["--cached", "-w", "--ignore-blank-lines", file])))
-            const filteredDiffs = relevantDiffs.map((diff, index) => `${"\n".repeat(Math.min(1, index))}${this.filterDiffForLLM(diff)}`)
-            messageParts.push([
-                "Diffs:",
-                ...filteredDiffs
-            ])
-        }
-
-        if (deletedFiles.size > 0) {
-            const message = [
-                "\n\nFiles which got deleted:",
-                ...deletedFiles.values().toArray(),
-            ]
-
-            messageParts.push(message)
-        }
-
-        if (nonSyntacticChangesFiles.size > 0) {
-            const nonSyntacticalDiffs = await Promise.all(nonSyntacticChangesFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff(["--cached", file])))
-            const message = [
-                "\n\nFiles with non syntactic changes:",
-                nonSyntacticalDiffs.join("\n")
-            ]
-
-            if (nonSyntacticChangesFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
-                message.push(`...and ${nonSyntacticChangesFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
-            }
-
-            messageParts.push(message)
-        }
-
-        if (ignoredFiles.size > 0) {
-            const ignoredFilesDiffStats = await Promise.all(ignoredFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff(["--cached", "--stat", file])))
-            const message = [
-                "\n\nFiles that are ignored because they are likely to be generated or lock files:",
-                ignoredFilesDiffStats.join("\n"),
-            ]
-
-            if (ignoredFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
-                message.push(`...and ${ignoredFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
-            }
-
-            messageParts.push(message)
-        }
-
-        return fitDiffsWithinTokenLimit(messageParts, remainingTokens).join("\n").trim()
     }
 
     async run() {
@@ -196,8 +84,16 @@ export default class AutoCommitCommand extends Command {
         const tokensOfInitialMessages = countTokens(initialMessages)
         LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
 
-        // fit diff into token limit
-        const diff = await this.getDiff(remainingTokensForLLM - tokensOfInitialMessages);
+
+        const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
+        const diffAnalyzerParams: DiffAnalyzerParams = {
+            remainingTokens: tokensForDiff,
+            ...(flags.reword
+                    ? { commitHash: flags.reword, type: "reword" }
+                    : { type: "commit" }
+            )
+        };
+        const diff = await diffAnalyzer(diffAnalyzerParams);
         LOGGER.debug(this, `Diff takes ${countTokens(diff)} tokens: ${diff}`)
 
         initialMessages.push({
@@ -227,7 +123,7 @@ export default class AutoCommitCommand extends Command {
                 LOGGER.fatal(this, "No commit message received from Groq API");
             }
 
-            finished = await this.handleUserDecision(commitMessage, chat);
+            finished = await this.handleUserDecision(commitMessage, chat, flags.reword);
         }
 
         if (!askForSavingSettings) {
@@ -241,25 +137,7 @@ export default class AutoCommitCommand extends Command {
         })
     }
 
-    shouldIncludeFile(file: string, ignorePatterns: string[] = [
-        "package-lock.json",
-        "pnpm-lock.yaml",
-        "yarn.lock",
-        "*.lock",
-        "*.min.js",
-        "dist/**",
-        "build/**",
-        "node_modules/**",
-    ]) {
-        return !ignorePatterns.some(pattern => {
-            if (pattern.includes("*")) {
-                const regex = new RegExp("^" + pattern.replaceAll('**', ".*").replaceAll('*', "[^/]*") + "$");
-                return regex.test(file);
-            }
 
-            return file === pattern;
-        });
-    }
 
     private async buildInitialMessages({
                                            examples,
@@ -310,64 +188,11 @@ Diffs of Staged Files:
         ] as ChatMessage[];
     }
 
-    /**
-     * Filters a git diff for LLM input to minimize tokens:
-     * - Keeps changed lines (+/-) and limited context
-     * - Keeps @@ lines but strips the position info (only keeps trailing context)
-     * - Removes index, binary, and other metadata lines
-     * - Keeps file headers (diff --git)
-     */
-    private filterDiffForLLM(diff: string): string {
-        const lines = diff.split("\n");
-        const keep: string[] = [];
-        const contextRadius = 2;
+    private async finalizeCommit(commitMessage: string | string[], rewordCommitHash?: string) {
+        const git = simpleGit();
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
+        await (rewordCommitHash ? rewordCommit(rewordCommitHash, commitMessage) : git.commit(commitMessage));
 
-            // Skip other metadata
-            if (/^(index|Binary files|old mode|new mode)/.test(line)) {
-                continue;
-            }
-
-            // Keep file headers
-            if (line.startsWith('diff --git ')) {
-                keep.push(line);
-                continue;
-            }
-
-            // Handle @@ lines: keep only context text after them
-            if (line.startsWith('@@')) {
-                const cleaned = line.replace(/^@@.*@@ ?/, "").trim();
-                if (cleaned.length > 0) {
-                    keep.push(cleaned);
-                }
-
-                continue;
-            }
-
-            // Keep modified lines and a few context ones
-            if (/^[+-]/.test(line)) {
-                if (line.startsWith('+++') || line.startsWith('---')) {
-                    continue;
-                }
-
-                const start = Math.max(0, i - contextRadius);
-                const end = Math.min(lines.length, i + contextRadius + 1);
-                for (let j = start; j < end; j++) {
-                    const neighbor = lines[j];
-                    if (/^(index|@@|Binary files|old mode|new mode)/.test(neighbor)) {
-                        continue
-                    }
-
-                    if (!keep.includes(neighbor)) {
-                        keep.push(neighbor);
-                    }
-                }
-            }
-        }
-
-        return keep.join("\n").trim();
     }
 
     private async getFinalConfig(flags: AutoCommitFlags) {
@@ -401,7 +226,7 @@ Diffs of Staged Files:
 
             const examples = []
             while(true) {
-                const result = await promptForCommitMessageConfigValue(this, {
+                const result = await promptForCommitMessageValue(this, {
                     message: "Provide some examples of commit messages you would like to generate: (leave empty if you don't want to provide any further examples)"
                 })
 
@@ -426,8 +251,7 @@ Diffs of Staged Files:
         }
     }
 
-    private async handleUserDecision(commitMessage: string, chat: LLMChat) {
-        const git = simpleGit();
+    private async handleUserDecision(commitMessage: string, chat: LLMChat, rewordCommitHash?: string) {
         this.log(chalk.blue("\n🤖 Suggested commit message:"));
         this.log(`   ${chalk.green(commitMessage)}\n`);
 
@@ -443,7 +267,7 @@ Diffs of Staged Files:
 
         switch (decision) {
             case "accept": {
-                await git.commit(this.transformGeneratedCommitMessage(commitMessage));
+                await this.finalizeCommit(commitMessage, rewordCommitHash)
                 this.log(chalk.green("✅ Commit executed!"));
                 return true;
             }
@@ -454,20 +278,16 @@ Diffs of Staged Files:
             }
 
             case "edit": {
-                const [firstLine, rest] = this.transformGeneratedCommitMessage(commitMessage);
-                const result = await renderCommitMessageInput({
+                const [firstLine, rest] = transformGeneratedCommitMessage(commitMessage);
+                const result = await promptForCommitMessageValue(this, {
                     defaultValues: {
                         description: rest?.split("\n") || [],
                         message: firstLine
                     },
                     message: "Manually edit the commit message:"
-                });
+                })
 
-                if (result === null) {
-                    this.exit(SIGINT_ERROR_NUMBER)
-                }
-
-                await git.commit([result.message, ...result.description]);
+                await this.finalizeCommit([result.message, ...result.description], rewordCommitHash)
                 this.log(chalk.green("✅ Commit executed with custom message!"));
 
                 return true;
@@ -498,17 +318,5 @@ Diffs of Staged Files:
                 this.exit(SIGINT_ERROR_NUMBER);
             }
         }
-    }
-
-    private transformGeneratedCommitMessage(commitMessage: string): [string, string] | [string] {
-        const indexOfLineBreak = commitMessage.indexOf("\n");
-        if (indexOfLineBreak === -1) {
-            return [commitMessage];
-        }
-
-        const firstLine = commitMessage.slice(0, indexOfLineBreak).trim();
-        const rest = commitMessage.slice(indexOfLineBreak + 1).trim();
-
-        return [firstLine, rest]
     }
 }
