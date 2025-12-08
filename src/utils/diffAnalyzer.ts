@@ -4,21 +4,23 @@ import { decode, encode, isWithinTokenLimit } from "./gpt-tokenizer.js";
 
 async function diffFilesPerType(params: DiffAnalyzerParams) {
     const git = simpleGit();
-
     const isStaged = params.type === "commit";
-
     const baseArgs = isStaged
         ? ["diff", "--cached"]
         : ["show", params.commitHash];
 
-    // 1) get all changed files + status in one call
-    const nameStatus = await git.raw([
-        ...baseArgs,
-        "--name-status",
-        "--pretty=",
+    // Get both name-status AND full diff in parallel
+    const [nameStatus, fullDiff] = await Promise.all([
+        git.raw([...baseArgs, "--name-status", "--pretty=format:"]),
+        git.raw([
+            ...baseArgs,
+            "--pretty=format:",
+            "-w",
+            "--ignore-blank-lines",
+        ]),
     ]);
 
-    const changedFiles = new Set<string>();
+    const nonRemovedFilesToStatusMap = new Map<string, string>();
     const deletedFiles = new Set<string>();
 
     for (const line of nameStatus.split("\n").filter(Boolean)) {
@@ -30,55 +32,79 @@ async function diffFilesPerType(params: DiffAnalyzerParams) {
         if (status === "D") {
             deletedFiles.add(name);
         } else {
-            changedFiles.add(name);
+            nonRemovedFilesToStatusMap.set(name, status);
         }
     }
 
-    if (changedFiles.size === 0) {
+    if (nonRemovedFilesToStatusMap.size === 0) {
         return {
             deletedFiles,
-            ignoredFiles: new Set<string>(),
+            ignoredFilesStats: new Set<string>(),
             nonSyntacticChangesFiles: new Set<string>(),
             relevantDiffs: new Set<string>(),
         };
     }
 
-    const ignoredFilesStats = new Set<string>()
-    const nonSyntacticChangesFiles = new Set<string>()
-    const relevantDiffs = new Set<string>()
+    // Parse full diff to extract per-file diffs
+    const fileDiffs = new Map<string, string>();
+    const diffBlocks = fullDiff.split(/^diff --git /m).filter(Boolean);
 
-    // Common args for diff content
-    const diffArgsCommon = ["-w", "--ignore-blank-lines"];
+    for (const block of diffBlocks) {
+        const match = block.match(/^a\/(.+?) b\/.+$/m);
+        if (match) {
+            const filename = match[1];
+            fileDiffs.set(filename, `diff --git ${block}`);
+        }
+    }
 
-    for (const file of changedFiles) {
+    const ignoredFilesStats = new Set<string>();
+    const nonSyntacticChangesFiles = new Set<string>();
+    const relevantDiffs = new Set<string>();
+
+    // Process ignored files in parallel
+    const ignoredFiles = [...nonRemovedFilesToStatusMap.keys()].filter(
+        (file) => !shouldIncludeFile(file)
+    );
+
+    const ignoredStats = await Promise.allSettled(
+        ignoredFiles.map((file) => git.raw([...baseArgs, "--numstat", "--pretty=format:", "--", file]))
+    );
+
+    for (const result of ignoredStats) {
+        if (result.status === 'fulfilled' && result.value.trim().length > 0) {
+            const numstatLine = result.value;
+            const parts = numstatLine.trim().split(/\s+/);
+
+            if (parts.length !== 3) {
+                continue;
+            }
+
+            const [insertions, deletions, filename] = parts;
+            ignoredFilesStats.add(`${filename}: ${insertions} insertions(+), ${deletions} deletions(-)`);
+        }
+    }
+
+    // Process relevant files
+    for (const file of nonRemovedFilesToStatusMap.keys()) {
         if (!shouldIncludeFile(file)) {
-            const ignoredFileStats = await git.raw([...baseArgs, "--stat", file])
-            ignoredFilesStats.add(ignoredFileStats)
             continue;
         }
 
-        const diff = await git.raw(
-            isStaged
-                ? [...baseArgs, ...diffArgsCommon, "--", file]
-                : [...baseArgs, "--pretty=", ...diffArgsCommon, "--", file]
-        );
-
+        const diff = fileDiffs.get(file) || "";
         if (diff.trim() === "") {
-            nonSyntacticChangesFiles.add(file)
-            continue
+            nonSyntacticChangesFiles.add(file);
+        } else {
+            relevantDiffs.add(diff);
         }
-
-        relevantDiffs.add(diff)
     }
 
     return {
         deletedFiles,
-        ignoredFiles: ignoredFilesStats,
+        ignoredFilesStats,
         nonSyntacticChangesFiles,
         relevantDiffs,
     };
 }
-
 
 export type DiffAnalyzerParams = {
     commitHash: string,
@@ -91,8 +117,7 @@ export type DiffAnalyzerParams = {
 
 export async function diffAnalyzer(params: DiffAnalyzerParams) {
     const INCLUDE_MAXIMAL_FILE_COUNT = 5;
-    const git = simpleGit();
-    const { deletedFiles, ignoredFiles, nonSyntacticChangesFiles, relevantDiffs } = await diffFilesPerType(params)
+    const { deletedFiles, ignoredFilesStats, nonSyntacticChangesFiles, relevantDiffs } = await diffFilesPerType(params)
 
     const messageParts: string[][] = []
     if (relevantDiffs.size > 0) {
@@ -125,15 +150,14 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
         messageParts.push(message)
     }
 
-    if (ignoredFiles.size > 0) {
-        const ignoredFilesDiffStats = await Promise.all(ignoredFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).map(file => git.diff([...checkAgainst, "--stat", file])))
+    if (ignoredFilesStats.size > 0) {
         const message = [
             "\n\nFiles that are ignored because they are likely to be generated or lock files:",
-            ignoredFilesDiffStats.join("\n"),
+            ignoredFilesStats.values().take(INCLUDE_MAXIMAL_FILE_COUNT).toArray().join("\n"),
         ]
 
-        if (ignoredFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
-            message.push(`...and ${ignoredFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
+        if (ignoredFilesStats.size > INCLUDE_MAXIMAL_FILE_COUNT) {
+            message.push(`...and ${ignoredFilesStats.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
         }
 
         messageParts.push(message)
