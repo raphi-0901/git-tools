@@ -8,7 +8,7 @@ import { SIGINT_ERROR_NUMBER } from "../constants.js";
 type TextParams = {
     currentValue?: string;
     customMessage?: string;
-    schema: z.ZodSchema;
+    schema?: z.ZodSchema;
 }
 
 type CommitMessageParams = {
@@ -16,11 +16,11 @@ type CommitMessageParams = {
     message: string;
 }
 
-export async function promptForTextConfigValue(ctx: Command, { currentValue, customMessage, schema }: TextParams) {
+export async function promptForTextConfigValue(ctx: Command, params?: TextParams) {
     const promptedFinalValue = await promptForValue({
-        currentValue,
-        customMessage,
-        schema,
+        currentValue: params?.currentValue,
+        customMessage: params?.customMessage,
+        schema: params?.schema,
     })
 
     if (promptedFinalValue === null) {
@@ -50,12 +50,16 @@ export async function promptForValue<T>({
                                         }: {
     currentValue?: string;
     customMessage?: string;
-    schema: z.ZodSchema<T>;
+    schema?: z.ZodSchema<T>;
 }) {
     return renderTextInput({
         defaultValue: currentValue,
         message: customMessage || `Enter a value (leave empty to unset):`,
         validate(value: string) {
+            if(!schema) {
+                return true;
+            }
+
             const parsed = schema.safeParse(value);
             if (parsed.success) {
                 return true;
