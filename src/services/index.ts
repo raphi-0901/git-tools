@@ -1,4 +1,4 @@
-import { AutoBranchServiceConfig, AutoBranchServiceTypesConfig } from "../zod-schema/auto-branch-config.js";
+import { AutoBranchServiceConfig, AutoBranchServiceTypesConfig } from "../zod-schema/autoBranchConfig.js";
 import { GitHubService } from "./github-service.js";
 import { GitLabService } from "./gitlab-service.js";
 import { IssueService } from "./issue-service.js";

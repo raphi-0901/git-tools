@@ -1,6 +1,6 @@
 import { Gitlab } from "@gitbeaker/rest";
 
-import { IssueSummary } from "../types/issue-summary.js";
+import { IssueSummary } from "../types/IssueSummary.js";
 import { IssueService } from "./issue-service.js";
 
 export class GitLabService implements IssueService {

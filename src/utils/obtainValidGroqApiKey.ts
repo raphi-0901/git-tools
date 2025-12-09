@@ -3,7 +3,7 @@ import { AuthenticationError } from "openai/core/error";
 import { ExtendedCommand } from "../types/ExtendedCommand.js";
 import { GroqApiKeySchema } from "../zod-schema/groqApiKey.js";
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
-import { LLMChat } from "./llm-chat.js";
+import { LLMChat } from "./LLMChat.js";
 import * as LOGGER from "./logging.js";
 import { setSpinnerText, startSpinner, stopSpinner } from "./spinner.js";
 

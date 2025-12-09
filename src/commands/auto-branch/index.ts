@@ -3,19 +3,19 @@ import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
 import { getService } from "../../services/index.js";
-import { IssueSummary } from "../../types/issue-summary.js";
+import { IssueSummary } from "../../types/IssueSummary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
-import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
+import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
-import { getSchemaForUnionOfAutoBranch } from "../../utils/get-schema-for-union-of-auto-branch.js";
-import { countTokens } from "../../utils/gpt-tokenizer.js";
-import { isOnline } from "../../utils/is-online.js";
-import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
+import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
+import { countTokens } from "../../utils/gptTokenizer.js";
+import { isOnline } from "../../utils/isOnline.js";
+import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { createSpinner } from "../../utils/spinner.js";
@@ -23,7 +23,7 @@ import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
     AutoBranchUpdateConfig
-} from "../../zod-schema/auto-branch-config.js";
+} from "../../zod-schema/autoBranchConfig.js";
 
 export default class AutoBranchCommand extends Command {
     static args = {

@@ -5,17 +5,17 @@ import { simpleGit } from "simple-git";
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
-import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
-import { checkIfInGitRepository } from "../../utils/check-if-in-git-repository.js";
 import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
+import { checkIfFilesStaged } from "../../utils/checkIfFilesStaged.js";
+import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForCommitMessageValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
-import { countTokens } from "../../utils/gpt-tokenizer.js";
-import { isOnline } from "../../utils/is-online.js";
-import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
+import { countTokens } from "../../utils/gptTokenizer.js";
+import { isOnline } from "../../utils/isOnline.js";
+import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { rewordCommit } from "../../utils/rewordCommitMessage.js";
@@ -24,7 +24,7 @@ import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedC
 import {
     AutoCommitConfigSchema,
     AutoCommitUpdateConfig
-} from "../../zod-schema/auto-commit-config.js";
+} from "../../zod-schema/autoCommitConfig.js";
 
 type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
 

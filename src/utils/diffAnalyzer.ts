@@ -1,6 +1,6 @@
 import { simpleGit } from "simple-git";
 
-import { decode, encode, isWithinTokenLimit } from "./gpt-tokenizer.js";
+import { decode, encode, isWithinTokenLimit } from "./gptTokenizer.js";
 
 async function diffFilesPerType(params: DiffAnalyzerParams) {
     const git = simpleGit();

@@ -3,7 +3,7 @@ import { deepmerge } from "deepmerge-ts";
 import os from "node:os";
 import path from "node:path";
 
-import { getRepositoryRootPath } from "../get-repository-root-path.js";
+import { getRepositoryRootPath } from "../getRepositoryRootPath.js";
 import { readUserConfig } from "./readUserConfig.js";
 import { writeUserConfigToFile } from "./writeUserConfigToFile.js";
 

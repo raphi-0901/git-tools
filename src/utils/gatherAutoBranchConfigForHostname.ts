@@ -1,10 +1,10 @@
 import { Command } from "@oclif/core";
 
 import { renderSelectInput } from "../ui/SelectInput.js";
-import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from "../zod-schema/auto-branch-config.js";
+import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from "../zod-schema/autoBranchConfig.js";
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { SIGINT_ERROR_NUMBER } from "./constants.js";
-import { getSchemaForUnionOfAutoBranch } from "./get-schema-for-union-of-auto-branch.js";
+import { getSchemaForUnionOfAutoBranch } from "./getSchemaForUnionOfAutoBranch.js";
 
 // TODO maybe one function for creating a new config and one for editing an existing one?
 export async function gatherAutoBranchConfigForHostname(ctx: Command, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
