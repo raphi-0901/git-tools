@@ -3,10 +3,13 @@ import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
+import { renderCommitMessageInput } from "../../ui/CommitMessageInputHelper.js";
 import { checkIfFilesStaged } from "../../utils/check-if-files-staged.js";
-import { FATAL_ERROR_NUMBER, MAX_TOKENS } from "../../utils/constants.js";
+import { FATAL_ERROR_NUMBER } from "../../utils/constants.js";
 import { createSpinner } from "../../utils/create-spinner.js";
 import { fitDiffsWithinTokenLimit } from "../../utils/fit-diffs-within-token-limit.js";
+import { getRemainingTokensOfLLMChat } from "../../utils/get-remaining-token-of-llm-chat.js";
+import { countTokens } from "../../utils/gpt-tokenizer.js";
 import { isOnline } from "../../utils/is-online.js";
 import { ChatMessage, LLMChat } from "../../utils/llm-chat.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -41,7 +44,7 @@ export default class AutoCommitCommand extends Command {
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
-    async getDiff(stripDiff: boolean) {
+    async getDiff(remainingTokens: number) {
         const git = simpleGit();
 
         const stagedFiles = (await git.diff(["--cached", "--name-only"]))
@@ -63,43 +66,56 @@ export default class AutoCommitCommand extends Command {
          * Files which are investigated further
          */
         const includedFiles = stagedFiles.filter(file => this.shouldIncludeFile(file));
-        const includedBlankLinesDiffs = await Promise.all(includedFiles.map(file =>  git.diff(["--cached", "-w", "--ignore-blank-lines", file])))
+        const includedBlankLinesDiffs = await Promise.all(includedFiles.map(async file => ({
+            diff: await git.diff(["--cached", "-w", "--ignore-blank-lines", file]),
+            file
+        })))
 
         // filter out files which have no syntactical changes
-        const relevantDiffs = includedBlankLinesDiffs.filter(item => item.trim() !== "")
-        const nonSyntacticalDiffs = includedBlankLinesDiffs.filter(item => item.trim() === "")
+        const relevantDiffs = includedBlankLinesDiffs.filter(item => item.diff.trim() !== "")
+        const nonSyntacticalDiffs = includedBlankLinesDiffs.filter(item => item.diff.trim() === "")
 
         // if there are just spaces as changes, we should not generate a commit message just based on the file name
         if(relevantDiffs.length === 0) {
-            return `The following files have no syntactic changes:\n${includedFiles.join(", ")}`
+            // TODO wrap in fitDiffsInLLM function
+            return `The following files have no syntactic changes:\n${nonSyntacticalDiffs.map(item => item.file).join(", ")}`
         }
 
-
-
-        const finalDiffs = [
-            ...relevantDiffs,
-            ...nonSyntacticalDiffs,
-            ...ignoredFilesDiffStats,
-        ]
-
-
-
-
-        console.log('diffs :>>', diffs);
-
-
-        const finalDiffs = stripDiff ?
-            diffs.map(diff => this.filterDiffForLLM(diff)) :
-            diffs;
-
-        return fitDiffsWithinTokenLimit(finalDiffs, MAX_TOKENS).join("\n");
+        return fitDiffsWithinTokenLimit([
+            relevantDiffs.map(item => item.diff),
+            [
+                "The following files have no syntactic changes:\n",
+                ...nonSyntacticalDiffs.map(item => item.file)
+            ],
+            [
+              "The following files are ignored because they are likely to be generated or lock files:\n",
+                ...ignoredFilesDiffStats,
+            ]
+        ], remainingTokens)
+            .join("\n")
     }
 
     async run(): Promise<void> {
         const { flags } = await this.parse(AutoCommitCommand);
-        const diff = await this.getDiff(flags.stripDiff);
+
+        // Use the helper to render TextBox and get user input
+        try {
+            const result = await renderCommitMessageInput();
+
+            console.log(result);
+
+
+            if(result) {
+                this.log(`Received input - First: ${result.message}, Second: ${result.description}`);
+        }
+        }
+            catch (error) {
+            this.log("TextBox error:", error);
+        }
 
         const filesStaged = await checkIfFilesStaged();
+        console.log('filesStaged :>>', filesStaged);
+
         if(!filesStaged) {
             LOGGER.fatal(this, "No staged files to create a commit message.");
         }
@@ -107,14 +123,35 @@ export default class AutoCommitCommand extends Command {
         const { askForSavingSettings, finalGroqApiKey, finalInstructions } = await this.getFinalConfig(flags);
         await isOnline(this)
 
-
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start();
 
-        const chat = new LLMChat(finalGroqApiKey, await this.buildInitialMessages(finalInstructions, diff));
 
-        // TODO use this to maximize tokens size
-        await chat.getRemainingTokens();
+        const remainingTokensForLLM = await getRemainingTokensOfLLMChat({
+            apiKey: finalGroqApiKey,
+        });
+
+        const initialMessages = await this.buildInitialMessages(finalInstructions)
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        const tokensOfInitialMessages = countTokens(initialMessages)
+
+        // fit diff into token limit
+        const diff = await this.getDiff(remainingTokensForLLM - tokensOfInitialMessages);
+
+        console.log('diff :>>', diff);
+
+
+        console.log('countTokens(diff) :>>', countTokens(diff));
+
+        initialMessages.push({
+            content: diff,
+            role: "user",
+        })
+
+        const chat = new LLMChat(finalGroqApiKey,initialMessages);
+
         let finished = false;
         let commitMessage = "";
         while (!finished) {
@@ -161,7 +198,7 @@ export default class AutoCommitCommand extends Command {
         });
     }
 
-    private async buildInitialMessages(instructions: string, diff: string) {
+    private async buildInitialMessages(instructions: string) {
         const git = simpleGit();
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
@@ -178,7 +215,6 @@ Create a commit message using the following instructions and information.
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
 Diffs of Staged Files:
-${diff}
                 `,
                 role: "user",
             },
