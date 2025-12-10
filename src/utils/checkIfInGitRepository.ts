@@ -1,9 +1,9 @@
-import { Command } from "@oclif/core";
 import { simpleGit } from "simple-git";
 
+import { BaseCommand } from "../base-commands/BaseCommand.js";
 import * as LOGGER from "./logging.js";
 
-export async function checkIfInGitRepository(ctx: Command) {
+export async function checkIfInGitRepository(ctx: BaseCommand) {
     const git = simpleGit();
 
     const isRepository = await git.checkIsRepo();

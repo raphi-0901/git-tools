@@ -1,7 +1,8 @@
-import { Args, Command, Errors, Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
+import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { getService } from "../../services/index.js";
 import { IssueSummary } from "../../types/IssueSummary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
@@ -10,7 +11,7 @@ import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
-import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
+import { SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
@@ -18,14 +19,13 @@ import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
-import { createSpinner } from "../../utils/spinner.js";
 import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
     AutoBranchUpdateConfig
 } from "../../zod-schema/autoBranchConfig.js";
 
-export default class AutoBranchCommand extends Command {
+export default class AutoBranchCommand extends BaseCommand {
     static args = {
         issueUrl: Args.string({
             description: "Jira issue ID to fetch",
@@ -44,21 +44,14 @@ export default class AutoBranchCommand extends Command {
         }),
     };
     public readonly commandId = "auto-branch";
-    public readonly spinner = createSpinner();
+    public readonly configId = "branch"
 
     async catch(error: unknown) {
-        // skip errors already logged by LOGGER.fatal
-        if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
-            return;
-        }
-
-        LOGGER.error(this, error as string)
-
+        super.catch(error);
         this.log(chalk.red("🚫 Branch creation cancelled."));
     }
 
     async run() {
-
         const { args, flags } = await this.parse(AutoBranchCommand);
         await checkIfInGitRepository(this);
 
@@ -130,7 +123,7 @@ export default class AutoBranchCommand extends Command {
             return;
         }
 
-        await saveGatheredSettings(this, this.commandId, {
+        await saveGatheredSettings(this, {
             GROQ_API_KEY: finalGroqApiKey,
             HOSTNAMES: {
                 [hostname]: finalServiceConfigOfHostname,
@@ -176,7 +169,7 @@ Ticket Description: "${issue.description}"
     }
 
     private async getFinalConfig(hostname: string) {
-        const userConfig = await loadMergedUserConfig<AutoBranchUpdateConfig>(this, this.commandId);
+        const userConfig = await loadMergedUserConfig<AutoBranchUpdateConfig>(this);
 
         let askForSavingSettings = false;
         let finalGroqApiKey = userConfig.GROQ_API_KEY;

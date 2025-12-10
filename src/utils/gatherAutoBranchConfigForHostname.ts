@@ -1,5 +1,4 @@
-import { Command } from "@oclif/core";
-
+import AutoBranchCommand from "../commands/auto-branch/index.js";
 import { renderSelectInput } from "../ui/SelectInput.js";
 import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from "../zod-schema/autoBranchConfig.js";
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
@@ -7,7 +6,7 @@ import { SIGINT_ERROR_NUMBER } from "./constants.js";
 import { getSchemaForUnionOfAutoBranch } from "./getSchemaForUnionOfAutoBranch.js";
 
 // TODO maybe one function for creating a new config and one for editing an existing one?
-export async function gatherAutoBranchConfigForHostname(ctx: Command, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
+export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
     let newConfig: Partial<AutoBranchServiceConfig> = { ...currentConfig };
     const baseServiceChoices = AutoBranchServiceTypeValues.map((type) => ({
         label: type,
