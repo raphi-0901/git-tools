@@ -54,17 +54,11 @@ export async function saveLocalUserConfig<T extends object>(ctx: BaseCommand, da
     });
 }
 
-export async function getConfigDirPath(commandId: string, global = false) {
+export async function getConfigDirPath(ctx: Command, global: boolean) {
     if (global) {
-        const isWin = process.platform === "win32";
-        const baseDir = isWin
-            ? process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
-            : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-
-        return path.join(baseDir, commandId);
+        return ctx.config.configDir;
     }
 
-    // local config is repo-specific, so it is the same for all platforms
     const repositoryRootPath = await getRepositoryRootPath();
     return path.join(repositoryRootPath, `.git`);
 }

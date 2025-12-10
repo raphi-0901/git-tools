@@ -16,8 +16,8 @@ import { getUserConfigFilePath } from "./getUserConfigFilePath.js";
 export async function writeUserConfigToFile<T extends object>(ctx: BaseCommand, params: ConfigurationFileParamsForSave<T>) {
     const configPath = await getUserConfigFilePath(ctx, params);
     if (!configPath) {
-        const backupFileName = params.type === "local" ? localConfigFileNameBackup(params.commandId) : globalConfigFileNameBackup;
-        const fallbackPath = path.join(params.rootDir, backupFileName);
+        const fileNameFallback = fallbackConfigFileName(ctx.configId);
+        const fallbackPath = path.join(params.rootDir, fileNameFallback);
         LOGGER.debug(ctx, `There is currently no config file. Storing it in ${terminalLink(fallbackPath, `file://${fallbackPath}`)}`);
 
         await writeConfigBasedOnExtension(ctx, fallbackPath, params.data)
@@ -27,7 +27,10 @@ export async function writeUserConfigToFile<T extends object>(ctx: BaseCommand, 
     await writeConfigBasedOnExtension<T>(ctx, configPath, params.data);
 }
 
-async function writeConfigBasedOnExtension<T extends object>(ctx: Command, configPath: string, config: T) {
+async function writeConfigBasedOnExtension<T extends object>(ctx: BaseCommand, configPath: string, config: T) {
+    const dir = path.dirname(configPath);
+    fs.mkdirSync(dir, { recursive: true });
+
     const ext = path.extname(configPath).slice(1) as ConfigurationFileExtensionRecommendation;
 
     // --- JS (ESM) ---
