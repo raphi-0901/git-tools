@@ -53,6 +53,8 @@ export default class AutoBranchCommand extends BaseCommand {
 
     async run() {
         const { args, flags } = await this.parse(AutoBranchCommand);
+        this.timer.start("total");
+        this.timer.start("response");
         await checkIfInGitRepository(this);
 
         if (!URL.canParse(args.issueUrl)) {
@@ -109,6 +111,7 @@ export default class AutoBranchCommand extends BaseCommand {
             }
 
             LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+            LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
 
             this.spinner.stop()
 
@@ -117,8 +120,10 @@ export default class AutoBranchCommand extends BaseCommand {
             }
 
             finished = await this.handleUserDecision(branchName, chat);
+            this.timer.start("response")
         }
 
+        LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`)
         if (!askForSavingSettings) {
             return;
         }
