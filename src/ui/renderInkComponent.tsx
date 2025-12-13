@@ -1,13 +1,13 @@
 import { render } from "ink";
 import { ReactElement } from "react";
 
-export function renderInkComponent<T>(
+export function renderInkComponent<InputType, ReturnType = InputType>(
     elementFactory: (handlers: {
         cancel: () => void;
-        submit: (value: T) => void;
+        submit: (value: ReturnType) => void;
     }) => ReactElement
-): Promise<null | T> {
-    return new Promise<null | T>((resolve) => {
+): Promise<null | ReturnType> {
+    return new Promise((resolve) => {
         const { unmount } = render(
             elementFactory({
                 cancel() {
@@ -23,3 +23,4 @@ export function renderInkComponent<T>(
         );
     });
 }
+
