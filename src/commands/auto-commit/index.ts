@@ -51,6 +51,8 @@ export default class AutoCommitCommand extends BaseCommand {
 
     async run() {
         const { flags } = await this.parse(AutoCommitCommand);
+        this.timer.start("total");
+        this.timer.start("response");
         await checkIfInGitRepository(this);
 
         if(flags.reword) {
@@ -116,6 +118,7 @@ export default class AutoCommitCommand extends BaseCommand {
             }
 
             LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+            LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
 
             this.spinner.stop()
 
@@ -124,7 +127,10 @@ export default class AutoCommitCommand extends BaseCommand {
             }
 
             finished = await this.handleUserDecision(commitMessage, chat, flags.reword);
+            this.timer.start("response")
         }
+
+        LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`)
 
         if (!askForSavingSettings) {
             return;
