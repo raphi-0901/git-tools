@@ -6,6 +6,8 @@ import relativeTime from 'dayjs/plugin/relativeTime.js'
 import { simpleGit } from "simple-git";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
+import { ListItem, renderCheckboxList } from "../../ui/CheckboxList.js";
+import { promptForCheckboxList } from "../../utils/config/promptForConfigValue.js";
 import * as LOGGER from "../../utils/logging.js";
 import { createSpinner } from "../../utils/spinner.js";
 
@@ -140,16 +142,21 @@ export default class BranchCleanupCommand extends BaseCommand {
             }
         }
 
+
         // Step 4: interactive selection
-        const choices = [
-            ...[...mergedMap.entries()].map(([source, merges]) => ({
-                name: `${chalk.blueBright(source)} | Merged into: ${[...new Set([...merges.values()].map(m => m.target))].join(", ")}`,
-                short: source,
+        const items = [
+            { label: "Merged entries", type: "separator" } as ListItem<string>,
+            ...[...mergedMap.entries()].map(([source, merges]): ListItem<string> => ({
+                key: source,
+                label: `${chalk.blueBright(source)} | Merged into: ${[...new Set([...merges.values()].map(m => m.target))].join(", ")}`,
+                type: "item",
                 value: source,
             })),
-            ...staleBranches.map(sb => ({
-                name: `${chalk.yellowBright(sb.branch)} | Last commit: ${dayjs(sb.date).fromNow()}`,
-                short: sb.branch,
+            { label: "Stale branches", type: "separator" } as ListItem<string>,
+            ...staleBranches.map((sb, index): ListItem<string> => ({
+                key: sb.branch,
+                label: `${chalk.yellowBright(sb.branch)} | Last commit: ${dayjs(sb.date).fromNow()}`,
+                type: "item",
                 value: sb.branch,
             })),
         ];
@@ -157,18 +164,16 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
 
-        if(choices.length === 0) {
+        if(items.length === 0) {
             LOGGER.log(this, "No branches to delete.")
             this.logTotalTime()
             return;
         }
 
-        const branchesToDelete = await checkbox({
-            choices,
-            loop: false,
+        const branchesToDelete = await promptForCheckboxList(this, {
+            items,
             message: "Select the branches you want to delete:",
-            pageSize: choices.length,
-        });
+        })
 
         this.logTotalTime()
         console.log("branchesToDelete :>>", branchesToDelete, branchesToDelete.length);
