@@ -5,16 +5,16 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import toml from "toml";
 
+import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { ConfigurationFileExtensionRecommendation, ConfigurationFileParams } from "../../types/ConfigurationFile.js";
 import * as LOGGER from "../logging.js";
 import { getUserConfigFilePath } from "./getUserConfigFilePath.js";
-
 
 /**
  * Find and load a user config file of various formats in the specified directory.
  * Searches for files listed in CONFIG_FILENAMES.
  */
-export async function readUserConfig<T extends object>(ctx: Command, params: ConfigurationFileParams) {
+export async function readUserConfig<T extends object>(ctx: BaseCommand, params: ConfigurationFileParams) {
     const configPath = await getUserConfigFilePath(ctx, params);
     if (!configPath) {
         return null;
@@ -29,7 +29,7 @@ export async function readUserConfig<T extends object>(ctx: Command, params: Con
     }
 }
 
-async function loadConfig<T extends object>(ctx: Command, configPath: string) {
+async function loadConfig<T extends object>(ctx: BaseCommand, configPath: string) {
     const ext = path.extname(configPath).slice(1) as ConfigurationFileExtensionRecommendation;
 
     if (ext === "js") {

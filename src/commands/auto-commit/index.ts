@@ -1,8 +1,8 @@
-import { Command, Errors, Flags, Interfaces } from "@oclif/core";
+import { Flags, Interfaces } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
-import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
+import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
@@ -11,7 +11,7 @@ import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForCommitMessageValue, promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
-import { FATAL_ERROR_NUMBER, SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
+import { SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
@@ -19,7 +19,6 @@ import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { rewordCommit } from "../../utils/rewordCommitMessage.js";
-import { createSpinner } from "../../utils/spinner.js";
 import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedCommitMessage.js";
 import {
     AutoCommitConfigSchema,
@@ -28,7 +27,7 @@ import {
 
 type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
 
-export default class AutoCommitCommand extends Command {
+export default class AutoCommitCommand extends BaseCommand {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
         debug: Flags.boolean({
@@ -43,16 +42,10 @@ export default class AutoCommitCommand extends Command {
         }),
     };
     public readonly commandId = "auto-commit";
-    public readonly spinner = createSpinner();
+    public readonly configId = "commit";
 
     async catch(error: unknown) {
-        LOGGER.debug(this, error as string)
-
-        // skip errors already logged by LOGGER.fatal
-        if (error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
-            return;
-        }
-
+        super.catch(error);
         this.log(chalk.red("🚫 Commit cancelled."));
     }
 
@@ -137,14 +130,12 @@ export default class AutoCommitCommand extends Command {
             return;
         }
 
-        await saveGatheredSettings(this, this.commandId, {
+        await saveGatheredSettings(this, {
             EXAMPLES: finalExamples,
             GROQ_API_KEY: finalGroqApiKey,
             INSTRUCTIONS: finalInstructions,
         })
     }
-
-
 
     private async buildInitialMessages({
                                            examples,
@@ -203,7 +194,7 @@ Diffs of Staged Files:
     }
 
     private async getFinalConfig(flags: AutoCommitFlags) {
-        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this, this.commandId);
+        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this);
 
         let askForSavingSettings = false;
         let finalGroqApiKey = userConfig.GROQ_API_KEY;

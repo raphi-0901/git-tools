@@ -1,11 +1,9 @@
-import { SUPPORTED_CONFIG_EXTENSIONS } from "../constants.js";
+export const SUPPORTED_CONFIG_EXTENSIONS = ["js", "json", "yaml", "yml", "toml"] as const;
 
-export const globalConfigFileNameBackup = "config.js" as const;
-export function localConfigFileNameBackup(commandId: string) {
+export function fallbackConfigFileName(commandId: string) {
     return `${commandId}.config.js` as const;
 }
 
-export const globalConfigFileNames = SUPPORTED_CONFIG_EXTENSIONS.map(ext => `config.${ext}` as const);
-export function localConfigFileNames (commandId: string) {
+export function configFileNames (commandId: string) {
     return SUPPORTED_CONFIG_EXTENSIONS.map(ext => `${commandId}.config.${ext}` as const);
 }

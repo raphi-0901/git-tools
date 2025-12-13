@@ -1,23 +1,23 @@
-import { Command } from "@oclif/core";
 import { dump as yamlDump } from "js-yaml";
 import json2toml from 'json2toml';
 import fs from "node:fs";
 import path from "node:path";
 import terminalLink from "terminal-link";
 
+import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import {
     ConfigurationFileExtensionRecommendation,
     ConfigurationFileParamsForSave
 } from "../../types/ConfigurationFile.js";
 import * as LOGGER from "../logging.js";
-import { globalConfigFileNameBackup, localConfigFileNameBackup } from "./constants.js";
+import { fallbackConfigFileName } from "./constants.js";
 import { getUserConfigFilePath } from "./getUserConfigFilePath.js";
 
-export async function writeUserConfigToFile<T extends object>(ctx: Command, params: ConfigurationFileParamsForSave<T>) {
+export async function writeUserConfigToFile<T extends object>(ctx: BaseCommand, params: ConfigurationFileParamsForSave<T>) {
     const configPath = await getUserConfigFilePath(ctx, params);
     if (!configPath) {
-        const backupFileName = params.type === "local" ? localConfigFileNameBackup(params.commandId) : globalConfigFileNameBackup;
-        const fallbackPath = path.join(params.rootDir, backupFileName);
+        const fileNameFallback = fallbackConfigFileName(ctx.configId);
+        const fallbackPath = path.join(params.rootDir, fileNameFallback);
         LOGGER.debug(ctx, `There is currently no config file. Storing it in ${terminalLink(fallbackPath, `file://${fallbackPath}`)}`);
 
         await writeConfigBasedOnExtension(ctx, fallbackPath, params.data)
@@ -27,7 +27,10 @@ export async function writeUserConfigToFile<T extends object>(ctx: Command, para
     await writeConfigBasedOnExtension<T>(ctx, configPath, params.data);
 }
 
-async function writeConfigBasedOnExtension<T extends object>(ctx: Command, configPath: string, config: T) {
+async function writeConfigBasedOnExtension<T extends object>(ctx: BaseCommand, configPath: string, config: T) {
+    const dir = path.dirname(configPath);
+    fs.mkdirSync(dir, { recursive: true });
+
     const ext = path.extname(configPath).slice(1) as ConfigurationFileExtensionRecommendation;
 
     // --- JS (ESM) ---

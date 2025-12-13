@@ -1,23 +1,23 @@
 import { AuthenticationError } from "openai/core/error";
 
-import { ExtendedCommand } from "../types/ExtendedCommand.js";
+import { BaseCommand } from "../base-commands/BaseCommand.js";
 import { GroqApiKeySchema } from "../zod-schema/groqApiKey.js";
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { LLMChat } from "./LLMChat.js";
 import * as LOGGER from "./logging.js";
-import { setSpinnerText, startSpinner, stopSpinner } from "./spinner.js";
 
-export async function obtainValidGroqApiKey(ctx: ExtendedCommand, initialGroqApiKey: string) {
-    setSpinnerText(ctx, "Checking validity of GROQ API key...");
+export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey: string) {
+    ctx.spinner.text = "Checking validity of GROQ API key..."
+
     let remainingTokensForLLM: null | number = null;
     let groqApiKey = initialGroqApiKey;
     let chat = new LLMChat(groqApiKey);
 
     while (true) {
         try {
-            startSpinner(ctx)
+            ctx.spinner.start();
             remainingTokensForLLM = await chat.getRemainingTokens();
-            stopSpinner(ctx);
+            ctx.spinner.stop();
 
             LOGGER.debug(ctx, `Remaining tokens for LLM: ${remainingTokensForLLM}`)
             break;
@@ -26,7 +26,7 @@ export async function obtainValidGroqApiKey(ctx: ExtendedCommand, initialGroqApi
             await new Promise(resolve => {
                 setTimeout(resolve, 1000)
             });
-            stopSpinner(ctx);
+            ctx.spinner.stop();
 
             if (error instanceof AuthenticationError && error.status === 401) {
                 LOGGER.warn(ctx, "Your GROQ_API_KEY is invalid. Please provide a new one.");
