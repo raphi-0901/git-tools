@@ -80,6 +80,15 @@ const CommitMessageInput = ({ defaultValues, message, onCancel, onSubmit }: InkF
         return filledUpLines.map((line, i) => <Text key={i}>{line}</Text>);
     };
 
+    const renderHelpText = () => <Box marginTop={1}>
+        <Text>
+            Active: {activeInput} | Press <Text color="yellow">Tab</Text> to
+            switch, <Text color="yellow">Enter</Text> to create new line,{" "}
+            <Text color="yellow">↑/↓/←/→</Text> to navigate. Press{" "}
+            <Text color="yellow">Backspace</Text> on an empty line to delete it.
+        </Text>
+    </Box>
+
     if (isSubmitting) {
         return renderAnsweredQuestion(message, `${commitMessage}`)
     }
@@ -109,14 +118,7 @@ const CommitMessageInput = ({ defaultValues, message, onCancel, onSubmit }: InkF
             {renderCommitDescription()}
         </TitledBox>
 
-        <Box marginTop={1}>
-            <Text>
-                Active: {activeInput} | Press <Text color="yellow">Tab</Text> to
-                switch, <Text color="yellow">Enter</Text> to create new line,{" "}
-                <Text color="yellow">↑/↓/←/→</Text> to navigate. Press{" "}
-                <Text color="yellow">Backspace</Text> on an empty line to delete it.
-            </Text>
-        </Box>
+        {renderHelpText()}
     </Box>
 };
 
