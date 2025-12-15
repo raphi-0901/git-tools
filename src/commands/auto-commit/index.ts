@@ -1,4 +1,4 @@
-import { Flags, Interfaces } from "@oclif/core";
+import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
@@ -25,23 +25,13 @@ import {
     AutoCommitUpdateConfig
 } from "../../zod-schema/autoCommitConfig.js";
 
-type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
-
-export default class AutoCommitCommand extends BaseCommand {
+export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
-        debug: Flags.boolean({
-            description: "Show debug logs.",
-        }),
-        instructions: Flags.string({
-            char: "i",
-            description: "Provide a specific instruction to the model for the commit message",
-        }),
         reword: Flags.string({
             description: "Rewords the commit message of the given commit. The commit hash must be provided.",
         }),
     };
-    public readonly commandId = "auto-commit";
     public readonly configId = "commit";
 
     async catch(error: unknown) {
@@ -50,15 +40,14 @@ export default class AutoCommitCommand extends BaseCommand {
     }
 
     async run() {
-        const { flags } = await this.parse(AutoCommitCommand);
         this.timer.start("total");
         this.timer.start("response");
         await checkIfInGitRepository(this);
 
-        if(flags.reword) {
-            const commitExists = await checkIfCommitExists(flags.reword);
+        if(this.flags.reword) {
+            const commitExists = await checkIfCommitExists(this.flags.reword);
             if(!commitExists) {
-                LOGGER.fatal(this, `Commit with hash ${flags.reword} does not exist.`);
+                LOGGER.fatal(this, `Commit with hash ${this.flags.reword} does not exist.`);
             }
         } else {
             const filesStaged = await checkIfFilesStaged();
@@ -67,7 +56,7 @@ export default class AutoCommitCommand extends BaseCommand {
             }
         }
 
-        const finalConfig = await this.getFinalConfig(flags);
+        const finalConfig = await this.getFinalConfig();
         const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
         LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
@@ -90,8 +79,8 @@ export default class AutoCommitCommand extends BaseCommand {
         const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
         const diffAnalyzerParams: DiffAnalyzerParams = {
             remainingTokens: tokensForDiff,
-            ...(flags.reword
-                    ? { commitHash: flags.reword, type: "reword" }
+            ...(this.flags.reword
+                    ? { commitHash: this.flags.reword, type: "reword" }
                     : { type: "commit" }
             )
         };
@@ -126,7 +115,7 @@ export default class AutoCommitCommand extends BaseCommand {
                 LOGGER.fatal(this, "No commit message received from Groq API");
             }
 
-            finished = await this.handleUserDecision(commitMessage, chat, flags.reword);
+            finished = await this.handleUserDecision(commitMessage, chat, this.flags.reword);
             this.timer.start("response")
         }
 
@@ -199,7 +188,7 @@ Diffs of Staged Files:
 
     }
 
-    private async getFinalConfig(flags: AutoCommitFlags) {
+    private async getFinalConfig() {
         const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this);
 
         let askForSavingSettings = false;
@@ -213,7 +202,7 @@ Diffs of Staged Files:
             askForSavingSettings = true;
         }
 
-        let finalInstructions = flags.instructions ?? userConfig.INSTRUCTIONS;
+        let finalInstructions = userConfig.INSTRUCTIONS;
         if (!finalInstructions) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
             finalInstructions = await promptForTextConfigValue(this, {
