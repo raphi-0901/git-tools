@@ -35,7 +35,6 @@ export default class AutoCommitCommand extends BaseCommand {
             description: "Rewords the commit message of the given commit. The commit hash must be provided.",
         }),
     };
-    public readonly commandId = "auto-commit";
     public readonly configId = "commit";
 
     async catch(error: unknown) {

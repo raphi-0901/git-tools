@@ -39,7 +39,6 @@ export default class AutoBranchCommand extends BaseCommand {
             description: "Show debug logs.",
         }),
     };
-    public readonly commandId = "auto-branch";
     public readonly configId = "branch"
 
     async catch(error: unknown) {

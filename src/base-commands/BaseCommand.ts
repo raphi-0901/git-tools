@@ -6,7 +6,6 @@ import { createSpinner } from "../utils/spinner.js";
 import Timer from "../utils/Timer.js";
 
 export abstract class BaseCommand extends Command {
-    public abstract readonly commandId: string;
     public abstract readonly configId: string;
     public readonly spinner = createSpinner();
     public readonly timer = new Timer()
