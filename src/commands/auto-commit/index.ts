@@ -28,9 +28,6 @@ import {
 export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
-        debug: Flags.boolean({
-            description: "Show debug logs.",
-        }),
         reword: Flags.string({
             description: "Rewords the commit message of the given commit. The commit hash must be provided.",
         }),

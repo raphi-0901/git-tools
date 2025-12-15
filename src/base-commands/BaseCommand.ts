@@ -10,10 +10,14 @@ export type Args<T extends typeof Command> = Interfaces.InferredArgs<T['args']>
 
 export abstract class BaseCommand<T extends typeof Command = typeof Command> extends Command {
     static baseFlags = {
+        debug: Flags.boolean({
+            description: "Show debug logs.",
+        }),
         yes: Flags.boolean({
             char: 'y',
             description: 'Skip confirmation prompt',
         })
+    }
     protected args!: Args<T>
     public abstract readonly configId: string;
     protected flags!: Flags<T>

@@ -34,11 +34,6 @@ export default class AutoBranchCommand extends BaseCommand<typeof AutoBranchComm
         }),
     };
     static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
-    static flags = {
-            debug: Flags.boolean({
-            description: "Show debug logs.",
-        }),
-    };
     public readonly configId = "branch"
 
     async catch(error: unknown) {
