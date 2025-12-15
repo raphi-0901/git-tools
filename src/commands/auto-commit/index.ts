@@ -1,4 +1,4 @@
-import { Flags, Interfaces } from "@oclif/core";
+import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
@@ -25,7 +25,7 @@ import {
     AutoCommitUpdateConfig
 } from "../../zod-schema/autoCommitConfig.js";
 
-export default class AutoCommitCommand extends BaseCommand {
+export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
         debug: Flags.boolean({
@@ -43,15 +43,14 @@ export default class AutoCommitCommand extends BaseCommand {
     }
 
     async run() {
-        const { flags } = await this.parse(AutoCommitCommand);
         this.timer.start("total");
         this.timer.start("response");
         await checkIfInGitRepository(this);
 
-        if(flags.reword) {
-            const commitExists = await checkIfCommitExists(flags.reword);
+        if(this.flags.reword) {
+            const commitExists = await checkIfCommitExists(this.flags.reword);
             if(!commitExists) {
-                LOGGER.fatal(this, `Commit with hash ${flags.reword} does not exist.`);
+                LOGGER.fatal(this, `Commit with hash ${this.flags.reword} does not exist.`);
             }
         } else {
             const filesStaged = await checkIfFilesStaged();
@@ -83,8 +82,8 @@ export default class AutoCommitCommand extends BaseCommand {
         const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
         const diffAnalyzerParams: DiffAnalyzerParams = {
             remainingTokens: tokensForDiff,
-            ...(flags.reword
-                    ? { commitHash: flags.reword, type: "reword" }
+            ...(this.flags.reword
+                    ? { commitHash: this.flags.reword, type: "reword" }
                     : { type: "commit" }
             )
         };
@@ -119,7 +118,7 @@ export default class AutoCommitCommand extends BaseCommand {
                 LOGGER.fatal(this, "No commit message received from Groq API");
             }
 
-            finished = await this.handleUserDecision(commitMessage, chat, flags.reword);
+            finished = await this.handleUserDecision(commitMessage, chat, this.flags.reword);
             this.timer.start("response")
         }
 

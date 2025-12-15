@@ -1,4 +1,4 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 
@@ -25,7 +25,7 @@ import {
     AutoBranchUpdateConfig
 } from "../../zod-schema/autoBranchConfig.js";
 
-export default class AutoBranchCommand extends BaseCommand {
+export default class AutoBranchCommand extends BaseCommand<typeof AutoBranchCommand> {
     static args = {
         issueUrl: Args.string({
             description: "Jira issue ID to fetch",
@@ -47,16 +47,15 @@ export default class AutoBranchCommand extends BaseCommand {
     }
 
     async run() {
-        const { args, flags } = await this.parse(AutoBranchCommand);
         this.timer.start("total");
         this.timer.start("response");
         await checkIfInGitRepository(this);
 
-        if (!URL.canParse(args.issueUrl)) {
+        if (!URL.canParse(this.args.issueUrl)) {
             LOGGER.fatal(this, "IssueUrl was not a URL.");
         }
 
-        const issueUrl = new URL(args.issueUrl);
+        const issueUrl = new URL(this.args.issueUrl);
         const { hostname } = issueUrl;
 
         const finalConfig = await this.getFinalConfig(hostname);
@@ -74,7 +73,7 @@ export default class AutoBranchCommand extends BaseCommand {
             LOGGER.fatal(this, `Error while creating service for hostname: ${hostname}`);
         }
 
-        const issue = await service.getIssue(new URL(args.issueUrl))
+        const issue = await service.getIssue(new URL(this.args.issueUrl))
         if (!issue) {
             LOGGER.fatal(
                 this,
@@ -82,7 +81,7 @@ export default class AutoBranchCommand extends BaseCommand {
                 "If the issue is private, make sure to use an API key with the correct permissions.",
             );
         }
-        
+
         const initialMessages = this.buildInitialMessages(issue, finalServiceConfigOfHostname.instructions);
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
