@@ -38,10 +38,6 @@ export default class AutoBranchCommand extends BaseCommand {
             debug: Flags.boolean({
             description: "Show debug logs.",
         }),
-        instructions: Flags.string({
-            char: "i",
-            description: "Provide a specific instruction to the model for the branch generation.",
-        }),
     };
     public readonly commandId = "auto-branch";
     public readonly configId = "branch"
@@ -87,11 +83,8 @@ export default class AutoBranchCommand extends BaseCommand {
                 "If the issue is private, make sure to use an API key with the correct permissions.",
             );
         }
-
-        const instructions = flags.instructions ?? finalServiceConfigOfHostname.instructions;
-
-
-        const initialMessages = this.buildInitialMessages(issue, instructions);
+        
+        const initialMessages = this.buildInitialMessages(issue, finalServiceConfigOfHostname.instructions);
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         const tokensOfInitialMessages = countTokens(initialMessages)

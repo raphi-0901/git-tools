@@ -25,17 +25,11 @@ import {
     AutoCommitUpdateConfig
 } from "../../zod-schema/autoCommitConfig.js";
 
-type AutoCommitFlags = Interfaces.InferredFlags<typeof AutoCommitCommand["flags"]>;
-
 export default class AutoCommitCommand extends BaseCommand {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
         debug: Flags.boolean({
             description: "Show debug logs.",
-        }),
-        instructions: Flags.string({
-            char: "i",
-            description: "Provide a specific instruction to the model for the commit message",
         }),
         reword: Flags.string({
             description: "Rewords the commit message of the given commit. The commit hash must be provided.",
@@ -67,7 +61,7 @@ export default class AutoCommitCommand extends BaseCommand {
             }
         }
 
-        const finalConfig = await this.getFinalConfig(flags);
+        const finalConfig = await this.getFinalConfig();
         const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
         LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
@@ -199,7 +193,7 @@ Diffs of Staged Files:
 
     }
 
-    private async getFinalConfig(flags: AutoCommitFlags) {
+    private async getFinalConfig() {
         const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this);
 
         let askForSavingSettings = false;
@@ -213,7 +207,7 @@ Diffs of Staged Files:
             askForSavingSettings = true;
         }
 
-        let finalInstructions = flags.instructions ?? userConfig.INSTRUCTIONS;
+        let finalInstructions = userConfig.INSTRUCTIONS;
         if (!finalInstructions) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
             finalInstructions = await promptForTextConfigValue(this, {
