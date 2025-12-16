@@ -2,10 +2,10 @@ import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import dayjs from "dayjs";
 import relativeTime from 'dayjs/plugin/relativeTime.js'
-import { simpleGit } from "simple-git";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { ListItem, renderCheckboxList } from "../../ui/CheckboxList.js";
+import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import * as LOGGER from "../../utils/logging.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
 
@@ -35,7 +35,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         await this.parse(BranchCleanupCommand);
         this.timer.start("total")
         this.timer.start("response")
-        const git = simpleGit();
+        const git = getSimpleGit();
         this.spinner.start();
         this.spinner.text = "Fetching repository..."
 

@@ -1,10 +1,9 @@
-import { simpleGit } from "simple-git";
-
 import { BaseCommand } from "../base-commands/BaseCommand.js";
+import { getSimpleGit } from "./getSimpleGit.js";
 import * as LOGGER from "./logging.js";
 
 export async function checkoutAllRemoteBranchesLocally(ctx: BaseCommand) {
-    const git= simpleGit();
+    const git= getSimpleGit();
 
     LOGGER.log(ctx, "Fetching all remotes...");
     await git.fetch(["--all"]);
