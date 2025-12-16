@@ -226,15 +226,17 @@ Ticket Description: "${issue.description}"
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
 
-        const decision = await withPromptExit(this, () => renderSelectInput({
-            items: [
-                { label: "✅ Accept and create branch", value: "accept" },
-                { label: "✍️ Edit manually", value: "edit" },
-                { label: "🔁 Provide feedback", value: "feedback" },
-                { label: "❌ Cancel", value: "cancel" },
-            ] as const,
-            message: "What would you like to do?",
-        }));
+        const decision = this.flags.yes
+            ? "accept"
+            : await withPromptExit(this, () => renderSelectInput({
+                items: [
+                    { label: "✅ Accept and create branch", value: "accept" },
+                    { label: "✍️ Edit manually", value: "edit" },
+                    { label: "🔁 Provide feedback", value: "feedback" },
+                    { label: "❌ Cancel", value: "cancel" },
+                ] as const,
+                message: "What would you like to do?",
+            }));
 
         switch (decision) {
             case "accept": {

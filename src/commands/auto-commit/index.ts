@@ -248,15 +248,17 @@ Diffs of Staged Files:
         this.log(chalk.blue("\n🤖 Suggested commit message:"));
         this.log(`   ${chalk.green(commitMessage)}\n`);
 
-        const decision = await withPromptExit(this, () => renderSelectInput({
-            items: [
-                { label: "\u{1F680} Accept and commit", value: "accept" },
-                { label: "\u{21AA} Edit manually", value: "edit" },
-                { label: "\u{1F501} Provide feedback", value: "feedback" },
-                { label: "\u{1F6AB} Cancel", value: "cancel" },
-            ] as const,
-            message: "What would you like to do?",
-        }))
+        const decision = this.flags.yes
+            ? "accept"
+            : await withPromptExit(this, () => renderSelectInput({
+                items: [
+                    { label: "\u{1F680} Accept and commit", value: "accept" },
+                    { label: "\u{21AA} Edit manually", value: "edit" },
+                    { label: "\u{1F501} Provide feedback", value: "feedback" },
+                    { label: "\u{1F6AB} Cancel", value: "cancel" },
+                ] as const,
+                message: "What would you like to do?",
+            }))
 
         switch (decision) {
             case "accept": {
