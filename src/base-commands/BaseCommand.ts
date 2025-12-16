@@ -1,6 +1,6 @@
 import { Command, Errors, Flags, Interfaces } from "@oclif/core";
 
-import { FATAL_ERROR_NUMBER } from "../utils/constants.js";
+import { ERROR_NUMBERS } from "../utils/constants.js";
 import * as LOGGER from "../utils/logging.js";
 import { createSpinner } from "../utils/spinner.js";
 import Timer from "../utils/Timer.js";
@@ -25,8 +25,7 @@ export abstract class BaseCommand<T extends typeof Command = typeof Command> ext
     public readonly timer = new Timer()
 
     async catch(error: unknown) {
-        // skip errors already logged by LOGGER.fatal
-        if(error instanceof Errors.ExitError && error.oclif.exit === FATAL_ERROR_NUMBER) {
+        if(!this.needsToLogError(error)) {
             return;
         }
 
@@ -43,4 +42,13 @@ export abstract class BaseCommand<T extends typeof Command = typeof Command> ext
     }
 
     public abstract run(): Promise<void>;
+
+
+    private needsToLogError(error: unknown) {
+        if(!(error instanceof Errors.ExitError)) {
+            return true;
+        }
+
+        return !ERROR_NUMBERS.has(error.oclif.exit || Number.NaN)
+    }
 }
