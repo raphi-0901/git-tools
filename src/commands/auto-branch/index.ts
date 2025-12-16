@@ -11,7 +11,6 @@ import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
-import { SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
@@ -19,6 +18,7 @@ import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
+import { withPromptExit } from "../../utils/withPromptExist.js";
 import {
     AutoBranchConfigSchema,
     AutoBranchServiceConfig, AutoBranchServiceTypeValues,
@@ -226,15 +226,17 @@ Ticket Description: "${issue.description}"
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
 
-        const decision = await renderSelectInput({
-            items: [
-                { label: "✅ Accept and create branch", value: "accept" },
-                { label: "✍️ Edit manually", value: "edit" },
-                { label: "🔁 Provide feedback", value: "feedback" },
-                { label: "❌ Cancel", value: "cancel" },
-            ] as const,
-            message: "What would you like to do?",
-        });
+        const decision = this.flags.yes
+            ? "accept"
+            : await withPromptExit(this, () => renderSelectInput({
+                items: [
+                    { label: "✅ Accept and create branch", value: "accept" },
+                    { label: "✍️ Edit manually", value: "edit" },
+                    { label: "🔁 Provide feedback", value: "feedback" },
+                    { label: "❌ Cancel", value: "cancel" },
+                ] as const,
+                message: "What would you like to do?",
+            }));
 
         switch (decision) {
             case "accept": {
@@ -249,28 +251,23 @@ Ticket Description: "${issue.description}"
             }
 
             case "edit": {
-                const userEdit = await renderTextInput({ defaultValue: branchName, message: "Enter your custom branch name:" });
-                if(userEdit === null) {
-                    this.exit(SIGINT_ERROR_NUMBER)
-                }
-
+                const userEdit = await withPromptExit(this, () => renderTextInput({
+                    defaultValue: branchName,
+                    message: "Enter your custom branch name:"
+                }));
                 await git.checkoutLocalBranch(userEdit);
                 this.log(chalk.green("✅ Branch created with custom name!"));
+
                 return true;
             }
 
             case "feedback": {
-                const feedback = await renderTextInput({ message: "Provide your feedback for the LLM:" });
-                if(feedback === null) {
-                    this.exit(SIGINT_ERROR_NUMBER)
-                }
+                const feedback = await withPromptExit(this, () => renderTextInput({
+                    message: "Provide your feedback for the LLM:"
+                }));
 
                 chat.addMessage(feedback, "user");
                 return false;
-            }
-
-            default: {
-                return true;
             }
         }
     }
