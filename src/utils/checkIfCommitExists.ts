@@ -1,7 +1,7 @@
-import { simpleGit } from 'simple-git';
+import { getSimpleGit } from "./getSimpleGit.js";
 
 export async function checkIfCommitExists(hash: string) {
-    const git = simpleGit();
+    const git = getSimpleGit();
 
     try {
         await git.revparse([hash]);

@@ -1,9 +1,8 @@
-import { simpleGit } from "simple-git";
-
+import { getSimpleGit } from "./getSimpleGit.js";
 import { decode, encode, isWithinTokenLimit } from "./gptTokenizer.js";
 
 async function diffFilesPerType(params: DiffAnalyzerParams) {
-    const git = simpleGit();
+    const git = getSimpleGit();
     const isStaged = params.type === "commit";
     const baseArgs = isStaged
         ? ["diff", "--cached"]
