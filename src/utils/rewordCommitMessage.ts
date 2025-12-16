@@ -1,7 +1,8 @@
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { simpleGit } from "simple-git";
+
+import { getSimpleGit } from "./getSimpleGit.js";
 
 /**
  * Reword an arbitrary commit in a Git repository non-interactively using 'git rebase -i'.
@@ -13,7 +14,7 @@ export async function rewordCommit(
     commitHash: string,
     newMessage: string | string[]
 ) {
-    const git = simpleGit();
+    const git = getSimpleGit();
 
     const formattedMessage = Array.isArray(newMessage) ? newMessage.join("\n") : newMessage;
     const commitHashPrefix = commitHash.slice(0, 7);

@@ -1,6 +1,5 @@
 import { Args } from "@oclif/core";
 import chalk from "chalk";
-import { simpleGit } from "simple-git";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { getService } from "../../services/index.js";
@@ -13,6 +12,7 @@ import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
+import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
@@ -222,7 +222,7 @@ Ticket Description: "${issue.description}"
     }
 
     private async handleUserDecision(branchName: string, chat: LLMChat) {
-        const git = simpleGit();
+        const git = getSimpleGit();
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
 

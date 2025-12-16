@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
-import { simpleGit } from "simple-git";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
@@ -13,6 +12,7 @@ import { promptForTextConfigValue } from "../../utils/config/promptForConfigValu
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
+import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
@@ -140,7 +140,7 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
         examples: string[],
         instructions: string,
     }) {
-        const git = simpleGit();
+        const git = getSimpleGit();
         const branchSummary = await git.branch();
         const currentBranch = branchSummary.current;
 
@@ -183,7 +183,7 @@ Diffs of Staged Files:
     }
 
     private async finalizeCommit(commitMessage: string | string[], rewordCommitHash?: string) {
-        const git = simpleGit();
+        const git = getSimpleGit();
 
         await (rewordCommitHash ? rewordCommit(rewordCommitHash, commitMessage) : git.commit(commitMessage));
     }
