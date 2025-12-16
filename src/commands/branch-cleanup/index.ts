@@ -1,4 +1,3 @@
-import { checkbox } from "@inquirer/prompts";
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import dayjs from "dayjs";
@@ -7,9 +6,8 @@ import { simpleGit } from "simple-git";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { ListItem, renderCheckboxList } from "../../ui/CheckboxList.js";
-import { promptForCheckboxList } from "../../utils/config/promptForConfigValue.js";
 import * as LOGGER from "../../utils/logging.js";
-import { createSpinner } from "../../utils/spinner.js";
+import { withPromptExit } from "../../utils/withPromptExist.js";
 
 dayjs.extend(relativeTime)
 
@@ -153,7 +151,7 @@ export default class BranchCleanupCommand extends BaseCommand {
                 value: source,
             })),
             { label: "Stale branches", type: "separator" } as ListItem<string>,
-            ...staleBranches.map((sb, index): ListItem<string> => ({
+            ...staleBranches.map((sb): ListItem<string> => ({
                 key: sb.branch,
                 label: `${chalk.yellowBright(sb.branch)} | Last commit: ${dayjs(sb.date).fromNow()}`,
                 type: "item",
@@ -170,10 +168,10 @@ export default class BranchCleanupCommand extends BaseCommand {
             return;
         }
 
-        const branchesToDelete = await promptForCheckboxList(this, {
+        const branchesToDelete = await withPromptExit(this, () => renderCheckboxList({
             items,
             message: "Select the branches you want to delete:",
-        })
+        }));
 
         this.logTotalTime()
         console.log("branchesToDelete :>>", branchesToDelete, branchesToDelete.length);
