@@ -1,4 +1,3 @@
-import { Command } from "@oclif/core";
 import { load as yamlLoad } from 'js-yaml';
 import fs from "node:fs";
 import path from "node:path";
