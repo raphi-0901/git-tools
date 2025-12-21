@@ -20,7 +20,7 @@ $ npm install -g @rwirnsberger/git-tools
 $ git-tools COMMAND
 running command...
 $ git-tools (--version)
-@rwirnsberger/git-tools/1.1.1 linux-x64 node-v22.14.0
+@rwirnsberger/git-tools/1.2.0 linux-x64 node-v22.21.1
 $ git-tools --help [COMMAND]
 USAGE
   $ git-tools COMMAND
@@ -38,20 +38,20 @@ Generate Git branch names from Jira tickets with AI suggestions and interactive 
 
 ```
 USAGE
-  $ git-tools auto-branch ISSUEURL [--debug] [-i <value>]
+  $ git-tools auto-branch ISSUEURL [--debug] [-y]
 
 ARGUMENTS
   ISSUEURL  Jira issue ID to fetch
 
 FLAGS
-  -i, --instructions=<value>  Provide a specific instruction to the model for the branch generation.
-      --debug                 Show debug logs.
+  -y, --yes    Skip confirmation prompt
+      --debug  Show debug logs.
 
 DESCRIPTION
   Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
 ```
 
-_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.1.1/src/commands/auto-branch/index.ts)_
+_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.2.0/src/commands/auto-branch/index.ts)_
 
 ## `git-tools auto-commit`
 
@@ -59,16 +59,16 @@ Automatically generate commit messages from staged files with feedback loop
 
 ```
 USAGE
-  $ git-tools auto-commit [--debug] [-i <value>] [--reword <value>]
+  $ git-tools auto-commit [--debug] [-y] [--reword <value>]
 
 FLAGS
-  -i, --instructions=<value>  Provide a specific instruction to the model for the commit message
-      --debug                 Show debug logs.
-      --reword=<value>        Rewords the commit message of the given commit. The commit hash must be provided.
+  -y, --yes             Skip confirmation prompt
+      --debug           Show debug logs.
+      --reword=<value>  Rewords the commit message of the given commit. The commit hash must be provided.
 
 DESCRIPTION
   Automatically generate commit messages from staged files with feedback loop
 ```
 
-_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.1.1/src/commands/auto-commit/index.ts)_
+_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.2.0/src/commands/auto-commit/index.ts)_
 <!-- commandsstop -->
