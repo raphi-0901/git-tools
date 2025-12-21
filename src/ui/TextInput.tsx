@@ -1,5 +1,5 @@
+import TextInput from "@rwirnsberger/ink-text-input";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
 import React, { useEffect, useState } from "react";
 
 import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
