@@ -1,4 +1,4 @@
-import { TitledBox } from "@mishieck/ink-titled-box";
+import { TitledBox } from "@rwirnsberger/ink-titled-box";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import React, { useEffect, useState } from "react";

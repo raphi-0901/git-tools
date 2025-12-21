@@ -9,11 +9,11 @@
   "bugs": "https://github.com/raphi-0901/git-tools/issues",
   "dependencies": {
     "@gitbeaker/rest": "^43.5.0",
-    "@mishieck/ink-titled-box": "github:raphi-0901/ink-titled-box",
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",
     "@octokit/rest": "^22.0.0",
+    "@rwirnsberger/ink-titled-box": "^1.0.1",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "dayjs": "^1.11.18",
