@@ -13,6 +13,7 @@
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",
     "@octokit/rest": "^22.0.0",
+    "@rwirnsberger/ink-text-input": "^1.0.0",
     "@rwirnsberger/ink-titled-box": "^1.0.1",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
@@ -22,7 +23,6 @@
     "gpt-tokenizer": "^3.2.0",
     "ink": "^6.5.0",
     "ink-select-input": "^6.2.0",
-    "ink-text-input": "github:raphi-0901/ink-text-input",
     "inquirer": "^12.9.6",
     "is-online": "^12.0.1",
     "jira.js": "^5.2.2",
@@ -84,6 +84,8 @@
     "url": "git+https://github.com/raphi-0901/git-tools.git"
   },
   "scripts": {
+    "prepublishOnly": "npm run build",
+    "verify:install": "npm run build && npm pack && docker run --rm -it -v \"$PWD\":/pkg node:22 bash -lc \"npm install -g /pkg/*.tgz\"",
     "build": "shx rm -rf dist && tsc -b",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
