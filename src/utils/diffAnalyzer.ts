@@ -261,44 +261,46 @@ function filterDiffForLLM(diff: string): string {
  * @returns A trimmed version of `diffs`, ensuring total tokens stay within the limit. Uses at most 50 diffs in ascending order of length.
  */
 function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
-    // Attach original indices to each diff and sort by diff length (shortest first)
-    const sortedDiffs = diffs
-        .map((diffText, originalIndex) => ({ diffText, originalIndex }))
-        .sort((a, b) => encode(a.diffText).length - encode(b.diffText).length)
-        .slice(0, 50); // Limit to 50 diffs to avoid OOM errors
+    const diffsWithTokens = diffs.map((diffText, originalIndex) => {
+        const tokens = encode(diffText);
+        return {
+            diffText,
+            originalIndex,
+            tokenCount: tokens.length,
+            tokens,
+        };
+    });
+
+    const sortedDiffs = diffsWithTokens
+        .sort((a, b) => a.tokenCount - b.tokenCount)
+        .slice(0, 50);
 
     let tokensLeft = maxTokens;
     let avgTokensPerDiff = tokensLeft / sortedDiffs.length;
-    const keptDiffs: { diffText: string; originalIndex: number }[] = [];
 
-    for (const [diffIndex, { diffText, originalIndex }] of sortedDiffs.entries()) {
-        const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
+    const keptDiffs: typeof sortedDiffs = [];
 
-        // console.log('---------------------------------------');
-        // console.log('fitsWithinLimit :>>', fitsWithinLimit);
-        // console.log('tokensLeft :>>', tokensLeft);
-        // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
+    for (let i = 0; i < sortedDiffs.length; i++) {
+        const diff = sortedDiffs[i];
 
-        if (fitsWithinLimit === false) {
-            const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
-            keptDiffs.push({ diffText: trimmedDiff, originalIndex });
+        if (diff.tokenCount > avgTokensPerDiff) {
+            keptDiffs.push({
+                ...diff,
+                diffText: decode(diff.tokens.slice(0, avgTokensPerDiff)),
+            });
             tokensLeft -= avgTokensPerDiff;
         } else {
-            keptDiffs.push({ diffText, originalIndex });
-            tokensLeft -= fitsWithinLimit;
+            keptDiffs.push(diff);
+            tokensLeft -= diff.tokenCount;
         }
 
-        // console.log('---------------------------------------');
-
-        const remainingDiffs = sortedDiffs.length - 1 - diffIndex;
-        if (remainingDiffs > 0) {
-            avgTokensPerDiff = tokensLeft / remainingDiffs;
+        const remaining = sortedDiffs.length - i - 1;
+        if (remaining > 0) {
+            avgTokensPerDiff = tokensLeft / remaining;
         }
     }
 
-    // Restore the original order within the section
     keptDiffs.sort((a, b) => a.originalIndex - b.originalIndex);
-
-    // Return only the diff text strings, in section structure
-    return keptDiffs.map(diff => diff.diffText);
+    return keptDiffs.map(d => d.diffText);
 }
+
