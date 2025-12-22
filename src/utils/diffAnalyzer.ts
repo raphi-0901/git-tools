@@ -118,35 +118,38 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
     const INCLUDE_MAXIMAL_FILE_COUNT = 5;
     const { deletedFiles, ignoredFilesStats, nonSyntacticChangesFiles, relevantDiffs } = await diffFilesPerType(params)
 
-    const messageParts: string[][] = []
+    const filteredDiffs: string[] = ["Diffs:"]
     if (relevantDiffs.size > 0) {
-        const filteredDiffs = [...relevantDiffs].map((diff, index) => `${"\n".repeat(Math.min(1, index))}${filterDiffForLLM(diff)}`)
-        messageParts.push([
-            "Diffs:",
-            ...filteredDiffs
-        ])
+        filteredDiffs.push(
+            ...[...relevantDiffs].map((diff, index) => `${"\n".repeat(Math.min(1, index))}${filterDiffForLLM(diff)}`)
+        )
     }
 
+    const fixedParts: string[][] = []
     if (deletedFiles.size > 0) {
         const message = [
             "\n\nFiles which got deleted:",
-            ...deletedFiles.values().toArray(),
+            deletedFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).toArray().join("\n"),
         ]
 
-        messageParts.push(message)
+        if (deletedFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
+            message.push(`...and ${deletedFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
+        }
+
+        fixedParts.push(message)
     }
 
     if (nonSyntacticChangesFiles.size > 0) {
         const message = [
             "\n\nFiles with non syntactic changes:",
-            [...nonSyntacticChangesFiles].join("\n")
+            nonSyntacticChangesFiles.values().take(INCLUDE_MAXIMAL_FILE_COUNT).toArray().join("\n"),
         ]
 
         if (nonSyntacticChangesFiles.size > INCLUDE_MAXIMAL_FILE_COUNT) {
             message.push(`...and ${nonSyntacticChangesFiles.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
         }
 
-        messageParts.push(message)
+        fixedParts.push(message)
     }
 
     if (ignoredFilesStats.size > 0) {
@@ -159,10 +162,14 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
             message.push(`...and ${ignoredFilesStats.size - INCLUDE_MAXIMAL_FILE_COUNT} more.`)
         }
 
-        messageParts.push(message)
+        fixedParts.push(message)
     }
 
-    return fitDiffsWithinTokenLimit(messageParts, params.remainingTokens).join("\n").trim()
+    const fixedPartsString = fixedParts.flatMap(message => message.flat()).join("\n")
+    const tokensForFixedParts = encode(fixedPartsString).length;
+    const diffsWithinTokenLimit = fitDiffsWithinTokenLimit(filteredDiffs, params.remainingTokens - tokensForFixedParts).join("\n").trim()
+
+    return diffsWithinTokenLimit + fixedPartsString
 }
 
 function shouldIncludeFile(file: string, ignorePatterns: string[] = [
@@ -249,61 +256,55 @@ function filterDiffForLLM(diff: string): string {
 /**
  * Fit diffs within a given token limit.
  *
- * @param diffGroups An array of diff sections, where each section is an array of diff strings.
+ * @param diffs An array of diffs.
  * @param maxTokens The maximum total number of tokens allowed.
- * @returns A trimmed version of `diffGroups`, ensuring total tokens stay within the limit.
+ * @returns A trimmed version of `diffs`, ensuring total tokens stay within the limit.
  */
-function fitDiffsWithinTokenLimit(diffGroups: string[][], maxTokens: number) {
+function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
     // Attach original indices to each diff and sort by diff length (shortest first)
-    const sortedDiffGroups = diffGroups.map(section =>
-        section
-            .map((diffText, originalIndex) => ({ diffText, originalIndex }))
-            .sort((a, b) => a.diffText.length - b.diffText.length)
-    );
+    const sortedDiffs = diffs
+        .map((diffText, originalIndex) => ({ diffText, originalIndex }))
+        .sort((a, b) => a.diffText.length - b.diffText.length);
 
     let tokensLeft = maxTokens;
-    let avgTokensPerDiff = tokensLeft / sortedDiffGroups.flat().length;
-    const keptDiffGroups: { diffText: string; originalIndex: number }[][] = [];
+    let avgTokensPerDiff = tokensLeft / sortedDiffs.length;
+    const keptDiffs: { diffText: string; originalIndex: number }[] = [];
 
     // TODO: handle case where there are far too many diffs —
     // could discard extras or use LLM-based prioritization.
 
-    for (const [groupIndex, section] of sortedDiffGroups.entries()) {
-        keptDiffGroups.push([]);
+    for (const [diffIndex, { diffText, originalIndex }] of sortedDiffs.entries()) {
+        const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
 
-        for (const [diffIndex, { diffText, originalIndex }] of section.entries()) {
-            const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
+        // console.log('---------------------------------------');
+        // console.log('fitsWithinLimit :>>', fitsWithinLimit);
+        // console.log('tokensLeft :>>', tokensLeft);
+        // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
 
-            // console.log('---------------------------------------');
-            // console.log('fitsWithinLimit :>>', fitsWithinLimit);
-            // console.log('tokensLeft :>>', tokensLeft);
-            // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
+        if (fitsWithinLimit === false) {
+            // const tokenCount = encode(diffText).length;
+            // console.log('tokenCount :>>', tokenCount);
 
-            if (fitsWithinLimit === false) {
-                // const tokenCount = encode(diffText).length;
-                // console.log('tokenCount :>>', tokenCount);
-
-                // TODO: consider trimming equally from start and end while preserving diff headers
-                const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
-                keptDiffGroups[groupIndex].push({ diffText: trimmedDiff, originalIndex });
-                tokensLeft -= avgTokensPerDiff;
-            } else {
-                keptDiffGroups[groupIndex].push({ diffText, originalIndex });
-                tokensLeft -= fitsWithinLimit;
-            }
-
-            // console.log('---------------------------------------');
-
-            const remainingDiffs = section.length - 1 - diffIndex;
-            if (remainingDiffs > 0) {
-                avgTokensPerDiff = tokensLeft / remainingDiffs;
-            }
+            // TODO: consider trimming equally from start and end while preserving diff headers
+            const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
+            keptDiffs.push({ diffText: trimmedDiff, originalIndex });
+            tokensLeft -= avgTokensPerDiff;
+        } else {
+            keptDiffs.push({ diffText, originalIndex });
+            tokensLeft -= fitsWithinLimit;
         }
 
-        // Restore the original order within the section
-        keptDiffGroups[groupIndex].sort((a, b) => a.originalIndex - b.originalIndex);
+        // console.log('---------------------------------------');
+
+        const remainingDiffs = diffs.length - 1 - diffIndex;
+        if (remainingDiffs > 0) {
+            avgTokensPerDiff = tokensLeft / remainingDiffs;
+        }
     }
 
+    // Restore the original order within the section
+    keptDiffs.sort((a, b) => a.originalIndex - b.originalIndex);
+
     // Return only the diff text strings, in section structure
-    return keptDiffGroups.flatMap(section => section.flatMap(({ diffText }) => diffText));
+    return keptDiffs.map(diff => diff.diffText);
 }
