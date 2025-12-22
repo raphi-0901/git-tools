@@ -258,20 +258,18 @@ function filterDiffForLLM(diff: string): string {
  *
  * @param diffs An array of diffs.
  * @param maxTokens The maximum total number of tokens allowed.
- * @returns A trimmed version of `diffs`, ensuring total tokens stay within the limit.
+ * @returns A trimmed version of `diffs`, ensuring total tokens stay within the limit. Uses at most 50 diffs in ascending order of length.
  */
 function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
     // Attach original indices to each diff and sort by diff length (shortest first)
     const sortedDiffs = diffs
         .map((diffText, originalIndex) => ({ diffText, originalIndex }))
-        .sort((a, b) => a.diffText.length - b.diffText.length);
+        .sort((a, b) => encode(a.diffText).length - encode(b.diffText).length)
+        .slice(0, 50); // Limit to 50 diffs to avoid OOM errors
 
     let tokensLeft = maxTokens;
     let avgTokensPerDiff = tokensLeft / sortedDiffs.length;
     const keptDiffs: { diffText: string; originalIndex: number }[] = [];
-
-    // TODO: handle case where there are far too many diffs —
-    // could discard extras or use LLM-based prioritization.
 
     for (const [diffIndex, { diffText, originalIndex }] of sortedDiffs.entries()) {
         const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
@@ -282,10 +280,6 @@ function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
         // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
 
         if (fitsWithinLimit === false) {
-            // const tokenCount = encode(diffText).length;
-            // console.log('tokenCount :>>', tokenCount);
-
-            // TODO: consider trimming equally from start and end while preserving diff headers
             const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
             keptDiffs.push({ diffText: trimmedDiff, originalIndex });
             tokensLeft -= avgTokensPerDiff;
@@ -296,7 +290,7 @@ function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
 
         // console.log('---------------------------------------');
 
-        const remainingDiffs = diffs.length - 1 - diffIndex;
+        const remainingDiffs = sortedDiffs.length - 1 - diffIndex;
         if (remainingDiffs > 0) {
             avgTokensPerDiff = tokensLeft / remainingDiffs;
         }
