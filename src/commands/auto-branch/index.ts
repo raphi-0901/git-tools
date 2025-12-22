@@ -11,6 +11,7 @@ import { promptForTextConfigValue } from "../../utils/config/promptForConfigValu
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
+import { getLLMModel } from "../../utils/getLLMModel.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
@@ -84,6 +85,7 @@ export default class AutoBranchCommand extends BaseCommand<typeof AutoBranchComm
         LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
 
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
+        const model = getLLMModel(initialMessages.join("\n"));
 
         let finished = false;
         let branchName = "";
@@ -91,7 +93,7 @@ export default class AutoBranchCommand extends BaseCommand<typeof AutoBranchComm
             this.spinner.text = "Generating branch name from issue...";
             this.spinner.start()
             try {
-                branchName = await chat.generate();
+                branchName = await chat.generate(model);
             } catch (error) {
                 LOGGER.fatal(this, "Error while generating branch name: " + error)
             }

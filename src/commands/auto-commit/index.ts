@@ -12,6 +12,7 @@ import { promptForTextConfigValue } from "../../utils/config/promptForConfigValu
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
+import { getLLMModel } from "../../utils/getLLMModel.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
@@ -95,6 +96,8 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
 
         const chat = new LLMChat(finalGroqApiKey, initialMessages)
 
+        const model = getLLMModel(initialMessages.join("\n"));
+        LOGGER.debug(this, `Model: ${model}`)
         let finished = false;
         let commitMessage = "";
         while (!finished) {
@@ -102,7 +105,7 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
             this.spinner.start()
 
             try {
-                commitMessage = await chat.generate();
+                commitMessage = await chat.generate(model);
             } catch (error) {
                 LOGGER.fatal(this, "Error while generating commit message: " + error)
             }

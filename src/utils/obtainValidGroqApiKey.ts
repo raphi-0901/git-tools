@@ -3,6 +3,7 @@ import { AuthenticationError } from "openai/core/error";
 import { BaseCommand } from "../base-commands/BaseCommand.js";
 import { GroqApiKeySchema } from "../zod-schema/groqApiKey.js";
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
+import { getLLMModel } from "./getLLMModel.js";
 import { LLMChat } from "./LLMChat.js";
 import * as LOGGER from "./logging.js";
 
@@ -16,7 +17,7 @@ export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey:
     while (true) {
         try {
             ctx.spinner.start();
-            remainingTokensForLLM = await chat.getRemainingTokens();
+            remainingTokensForLLM = await chat.getRemainingTokens(getLLMModel("ping"));
             ctx.spinner.stop();
 
             LOGGER.debug(ctx, `Remaining tokens for LLM: ${remainingTokensForLLM}`)
