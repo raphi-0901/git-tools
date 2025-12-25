@@ -23,10 +23,12 @@ async function diffFilesPerType(params: DiffAnalyzerParams) {
     const deletedFiles = new Set<string>();
 
     for (const line of nameStatus.split("\n").filter(Boolean)) {
-        const [status, name] = line.trim().split(/\s+/);
-        if (!name) {
+        const match = line.trim().match(/^(\S+)\s+(.+)$/);
+        if (!match) {
             continue;
         }
+
+        const [, status, name] = match;
 
         if (status === "D") {
             deletedFiles.add(name);
