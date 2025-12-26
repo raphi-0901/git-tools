@@ -287,15 +287,13 @@ export default class BranchCleanupCommand extends BaseCommand {
         }
 
         if (localOnlyBranches.size > 0) {
-            items.push({ label: `Lokale Branches ohne Remote`, type: "separator" });
-            items.push(...[...localOnlyBranches.entries()].map(([branch, lastCommitDate]) => ({
+            items.push({ label: `Lokale Branches ohne Remote`, type: "separator" }, ...[...localOnlyBranches.entries()].map(([branch, lastCommitDate]) => ({
                 key: branch, label: `${chalk.magenta(branch)} ${chalk.dim(`(Nur lokal, aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
             })));
         }
 
         if (staleBranches.size > 0) {
-            items.push({ label: `Veraltete Branches (>30 Tage, synchron)`, type: "separator" });
-            items.push(...[...staleBranches.entries()].map(([branch, lastCommitDate]) => ({
+            items.push({ label: `Veraltete Branches (>30 Tage, synchron)`, type: "separator" }, ...[...staleBranches.entries()].map(([branch, lastCommitDate]) => ({
                 key: branch, label: `${chalk.gray(branch)} ${chalk.dim(`(Synchron, aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
             })));
         }
