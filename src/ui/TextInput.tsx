@@ -1,10 +1,10 @@
-import TextInput from "@rwirnsberger/ink-text-input";
-import { Box, Text, useInput } from "ink";
-import React, { useEffect, useState } from "react";
+import TextInput from '@rwirnsberger/ink-text-input'
+import { Box, Text, useInput } from 'ink'
+import React, { useEffect, useState } from 'react'
 
-import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
-import { renderQuestion } from "./helper/renderQuestion.js";
-import { renderInkComponent } from "./renderInkComponent.js";
+import { renderAnsweredQuestion } from './helper/renderAnsweredQuestion.js'
+import { renderQuestion } from './helper/renderQuestion.js'
+import { renderInkComponent } from './renderInkComponent.js'
 
 type TextInputWrapperProps<T> = {
     cancel: () => void;
@@ -21,48 +21,48 @@ function TextInputWithCancel({
                                  submit,
                                  validate
                              }: TextInputWrapperProps<string>) {
-    const [inputValue, setInputValue] = useState(defaultValue || "");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isCancelling, setIsCancelling] = useState(false);
-    const [validationMessage, setValidationMessage] = useState<null | string>(null);
+    const [inputValue, setInputValue] = useState(defaultValue || '')
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isCancelling, setIsCancelling] = useState(false)
+    const [validationMessage, setValidationMessage] = useState<null | string>(null)
 
     useInput((input, key) => {
-        if (key.ctrl && input === "c") {
-            setIsCancelling(true);
+        if (key.ctrl && input === 'c') {
+            setIsCancelling(true)
         }
-    });
+    })
 
     const handleSubmit = () => {
         if (validate && typeof validate === 'function') {
-            const isValid = validate(inputValue);
+            const isValid = validate(inputValue)
 
             if (isValid === true) {
                 setIsSubmitting(true)
-                return;
+                return
             }
 
             setValidationMessage(isValid)
-            return;
+            return
         }
 
         setIsSubmitting(true)
-    };
+    }
 
     useEffect(() => {
         if (isCancelling) {
-            cancel();
-            return;
+            cancel()
+            return
         }
 
         if (!isSubmitting) {
-            return;
+            return
         }
 
-        submit(inputValue);
-    }, [isSubmitting, isCancelling]);
+        submit(inputValue)
+    }, [isSubmitting, isCancelling])
 
     if (isCancelling) {
-        return <Text>Cancelling…</Text>;
+        return <Text>Cancelling…</Text>
     }
 
     if (isSubmitting) {
@@ -72,7 +72,7 @@ function TextInputWithCancel({
     return (
         <Box>
             {renderQuestion(message)}
-            <Text>{" "}</Text>
+            <Text>{' '}</Text>
             <TextInput
                 focus={true}
                 onChange={setInputValue}
@@ -81,7 +81,7 @@ function TextInputWithCancel({
             />
             {validationMessage && <Text color="red">{validationMessage}</Text>}
         </Box>
-    );
+    )
 }
 
 export function renderTextInput({
@@ -101,5 +101,5 @@ export function renderTextInput({
             submit={submit}
             validate={validate}
         />
-    ));
+    ))
 }

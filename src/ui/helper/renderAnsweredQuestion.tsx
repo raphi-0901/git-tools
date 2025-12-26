@@ -1,5 +1,5 @@
-import { Text } from "ink";
-import React from "react";
+import { Text } from 'ink'
+import React from 'react'
 
 export const renderAnsweredQuestion = (message: string, answer: string) => <Text>
     <Text color='green'>? </Text>

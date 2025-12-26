@@ -1,7 +1,7 @@
-import { getSimpleGit } from "./getSimpleGit.js";
+import { getSimpleGit } from './getSimpleGit.js'
 
 export function getRepositoryRootPath() {
-    const git = getSimpleGit();
+    const git = getSimpleGit()
 
-    return git.revparse(["--show-toplevel"]);
+    return git.revparse(['--show-toplevel'])
 }

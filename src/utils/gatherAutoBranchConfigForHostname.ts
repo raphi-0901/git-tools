@@ -1,27 +1,33 @@
-import AutoBranchCommand from "../commands/auto-branch/index.js";
-import { renderSelectInput } from "../ui/SelectInput.js";
-import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from "../zod-schema/autoBranchConfig.js";
-import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
-import { SIGINT_ERROR_NUMBER } from "./constants.js";
-import { getSchemaForUnionOfAutoBranch } from "./getSchemaForUnionOfAutoBranch.js";
+import AutoBranchCommand from '../commands/auto-branch/index.js'
+import { renderSelectInput } from '../ui/SelectInput.js'
+import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from '../zod-schema/autoBranchConfig.js'
+import { promptForTextConfigValue } from './config/promptForConfigValue.js'
+import { SIGINT_ERROR_NUMBER } from './constants.js'
+import { getSchemaForUnionOfAutoBranch } from './getSchemaForUnionOfAutoBranch.js'
 
 // TODO maybe one function for creating a new config and one for editing an existing one?
-export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
-    let newConfig: Partial<AutoBranchServiceConfig> = { ...currentConfig };
+export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {
+}) {
+    let newConfig: Partial<AutoBranchServiceConfig> = {
+ ...currentConfig 
+}
     const baseServiceChoices = AutoBranchServiceTypeValues.map((type) => ({
         label: type,
         value: type,
-    }));
+    }))
 
     const deleteChoice =
         allHostnames.includes(hostnameToAdd)
-            ? { label: "delete", value: "delete" } as const
-            : null;
+            ? {
+ label: 'delete',
+value: 'delete' 
+} as const
+            : null
 
     const serviceType = await renderSelectInput({
         items: deleteChoice ? [...baseServiceChoices, deleteChoice] : baseServiceChoices,
-        message: "Select your service type",
-    });
+        message: 'Select your service type',
+    })
 
     if (serviceType === null) {
         ctx.exit(SIGINT_ERROR_NUMBER)
@@ -31,14 +37,14 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
         return
     }
 
-    newConfig.type = serviceType;
+    newConfig.type = serviceType
 
     // get current options of service from zod
-    const schemaForType = getSchemaForUnionOfAutoBranch(serviceType)!;
+    const schemaForType = getSchemaForUnionOfAutoBranch(serviceType)!
 
     // todo try to fit examples into this for loop
     for (const [key, fieldSchema] of Object.entries(schemaForType.shape)) {
-        if (key === "type") {
+        if (key === 'type') {
             continue
         }
 
@@ -52,12 +58,12 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
             const examples = []
             while(true) {
                 const example = await promptForTextConfigValue(ctx, {
-                    customMessage: "Provide some examples of branch names you would like to generate: (leave empty if you don't want to provide any further examples)",
+                    customMessage: 'Provide some examples of branch names you would like to generate: (leave empty if you don\'t want to provide any further examples)',
                     schema: schemaForType.shape.examples.element
-                });
+                })
 
-                if(example.trim() === "") {
-                    break;
+                if(example.trim() === '') {
+                    break
                 }
 
                 examples.push(example)
@@ -72,17 +78,17 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
 
             // should never happen, but for TS
             if(Array.isArray(currentValue)) {
-                continue;
+                continue
             }
 
             const answerForKey = await promptForTextConfigValue(ctx, {
                 currentValue,
                 customMessage: `Enter a value for ${key}:`,
                 schema: fieldSchema,
-            });
+            })
 
-            if (answerForKey === "") {
-                delete newConfig[key as keyof AutoBranchServiceConfig];
+            if (answerForKey === '') {
+                delete newConfig[key as keyof AutoBranchServiceConfig]
                 continue
             }
 

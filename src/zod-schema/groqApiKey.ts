@@ -1,3 +1,3 @@
-import * as z from "zod";
+import * as z from 'zod'
 
-export const GroqApiKeySchema = z.string();
+export const GroqApiKeySchema = z.string()

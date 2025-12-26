@@ -1,10 +1,10 @@
-import { Octokit } from "@octokit/rest";
+import { Octokit } from '@octokit/rest'
 
-import { IssueSummary } from "../types/IssueSummary.js";
-import { IssueService } from "./issue-service.js";
+import { IssueSummary } from '../types/IssueSummary.js'
+import { IssueService } from './issue-service.js'
 
 export class GitHubService implements IssueService {
-    private client: Octokit;
+    private client: Octokit
 
     constructor(private apiKey: string) {
         this.client = new Octokit({
@@ -15,20 +15,20 @@ export class GitHubService implements IssueService {
                 info() {},
                 warn() {},
             },
-        });
+        })
     }
 
     async getIssue(issueUrl: URL): Promise<IssueSummary | null> {
         try {
-            const pathParts = issueUrl.pathname.split("/").filter(Boolean);
+            const pathParts = issueUrl.pathname.split('/').filter(Boolean)
             if (pathParts.length < 4) {
-                return null;
+                return null
             }
 
-            const [owner, repo, , issueNumberStr] = pathParts;
-            const issueNumber = Number.parseInt(issueNumberStr, 10);
+            const [owner, repo, , issueNumberStr] = pathParts
+            const issueNumber = Number.parseInt(issueNumberStr, 10)
             if (Number.isNaN(issueNumber)) {
-                return null;
+                return null
             }
 
             // Fetch issue using Octokit
@@ -37,19 +37,19 @@ export class GitHubService implements IssueService {
                 issue_number: issueNumber,
                 owner,
                 repo,
-            });
+            })
 
             return {
-                description: data.body || "",
+                description: data.body || '',
                 summary: data.title,
                 ticketId: String(data.number),
-            };
+            }
         } catch {
-            return null;
+            return null
         }
     }
 
     getIssueName() {
-        return "github" as const;
+        return 'github' as const
     }
 }

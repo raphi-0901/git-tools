@@ -1,30 +1,31 @@
-import type { Options } from "yocto-spinner";
+import type { Options } from 'yocto-spinner'
 
-import { deepmerge } from "deepmerge-ts";
-import yoctoSpinner from "yocto-spinner";
+import { deepmerge } from 'deepmerge-ts'
+import yoctoSpinner from 'yocto-spinner'
 
-import { BaseCommand } from "../base-commands/BaseCommand.js";
+import { BaseCommand } from '../base-commands/BaseCommand.js'
 
-export function createSpinner(options: Options = {}) {
+export function createSpinner(options: Options = {
+}) {
     const mergedOptions = deepmerge({
         spinner: {
-            "frames": [
-                "⠄",
-                "⠆",
-                "⠇",
-                "⠋",
-                "⠙",
-                "⠸",
-                "⠰",
-                "⠠",
-                "⠰",
-                "⠸",
-                "⠙",
-                "⠋",
-                "⠇",
-                "⠆"
+            'frames': [
+                '⠄',
+                '⠆',
+                '⠇',
+                '⠋',
+                '⠙',
+                '⠸',
+                '⠰',
+                '⠠',
+                '⠰',
+                '⠸',
+                '⠙',
+                '⠋',
+                '⠇',
+                '⠆'
             ],
-            "interval": 80
+            'interval': 80
         },
     }, options)
 

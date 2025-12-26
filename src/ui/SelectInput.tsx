@@ -1,11 +1,11 @@
-import { Box, Text, useInput } from "ink";
-import SelectInput from "ink-select-input";
-import React, { useEffect, useState } from "react";
+import { Box, Text, useInput } from 'ink'
+import SelectInput from 'ink-select-input'
+import React, { useEffect, useState } from 'react'
 
-import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
-import { renderCancelledQuestion } from "./helper/renderCancelledQuestion.js";
-import { renderQuestion } from "./helper/renderQuestion.js";
-import { renderInkComponent } from "./renderInkComponent.js";
+import { renderAnsweredQuestion } from './helper/renderAnsweredQuestion.js'
+import { renderCancelledQuestion } from './helper/renderCancelledQuestion.js'
+import { renderQuestion } from './helper/renderQuestion.js'
+import { renderInkComponent } from './renderInkComponent.js'
 
 export type SelectInputItem<T> = {
     key?: string;
@@ -24,45 +24,45 @@ function SelectInputWithCancel<T>({
     message: string;
     submit: (value: T) => void;
 }) {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isCancelling, setIsCancelling] = useState(false);
-    const [value, setValue] = useState<null | SelectInputItem<T>>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isCancelling, setIsCancelling] = useState(false)
+    const [value, setValue] = useState<null | SelectInputItem<T>>(null)
     const mappedItems = items.map(item => ({
         key: item.key || item.label,
         label: item.label,
         value: item.value
-    }));
+    }))
 
     useInput((input, key) => {
-        if (key.ctrl && input === "c") {
-            setIsCancelling(true);
+        if (key.ctrl && input === 'c') {
+            setIsCancelling(true)
         }
-    });
+    })
 
     const handleSelect = (item: SelectInputItem<T>) => {
-        setValue(item);
-        setIsSubmitting(true);
-    };
+        setValue(item)
+        setIsSubmitting(true)
+    }
 
     useEffect(() => {
         if (isCancelling) {
-            cancel();
-            return;
+            cancel()
+            return
         }
 
         if (!isSubmitting || !value) {
-            return;
+            return
         }
 
-        submit(value.value);
-    }, [isSubmitting, isCancelling]);
+        submit(value.value)
+    }, [isSubmitting, isCancelling])
 
     if (isCancelling) {
         return renderCancelledQuestion(message)
     }
 
     if (isSubmitting) {
-        return renderAnsweredQuestion(message, value?.label || "")
+        return renderAnsweredQuestion(message, value?.label || '')
     }
 
     return (
@@ -73,7 +73,7 @@ function SelectInputWithCancel<T>({
                 onSelect={handleSelect}
             />
         </>
-    );
+    )
 }
 
 export function renderSelectInput<T>({
@@ -90,5 +90,5 @@ export function renderSelectInput<T>({
             message={message}
             submit={submit}
         />
-    ));
+    ))
 }

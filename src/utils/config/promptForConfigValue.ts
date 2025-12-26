@@ -1,8 +1,8 @@
-import { Command } from "@oclif/core";
-import * as z from "zod";
+import { Command } from '@oclif/core'
+import * as z from 'zod'
 
-import { renderTextInput } from "../../ui/TextInput.js";
-import { withPromptExit } from "../withPromptExist.js";
+import { renderTextInput } from '../../ui/TextInput.js'
+import { withPromptExit } from '../withPromptExist.js'
 
 type TextParams = {
     currentValue?: string;
@@ -13,18 +13,18 @@ type TextParams = {
 export async function promptForTextConfigValue(ctx: Command, params?: TextParams) {
     return withPromptExit(ctx, () => renderTextInput({
         defaultValue: params?.currentValue,
-        message: params?.customMessage || `Enter a value (leave empty to unset):`,
+        message: params?.customMessage || 'Enter a value (leave empty to unset):',
         validate(value: string) {
             if(!params?.schema) {
-                return true;
+                return true
             }
 
-            const parsed = params.schema.safeParse(value);
+            const parsed = params.schema.safeParse(value)
             if (parsed.success) {
-                return true;
+                return true
             }
 
-            return parsed.error.issues[0].message;
+            return parsed.error.issues[0].message
         }
-    }));
+    }))
 }

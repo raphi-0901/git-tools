@@ -1,11 +1,11 @@
-import { simpleGit, type SimpleGit } from "simple-git";
+import { simpleGit, type SimpleGit } from 'simple-git'
 
-let gitInstance: null | SimpleGit = null;
+let gitInstance: null | SimpleGit = null
 
 export function getSimpleGit(): SimpleGit {
     if (!gitInstance) {
         gitInstance = simpleGit()
     }
 
-    return gitInstance;
+    return gitInstance
 }

@@ -1,28 +1,34 @@
-import * as OpenAI from "openai";
+import * as OpenAI from 'openai'
 
-import { GROQ_BASE_URL, MAX_TOKENS, STANDARD_LLM_MODEL } from "./constants.js";
+import { GROQ_BASE_URL, MAX_TOKENS, STANDARD_LLM_MODEL } from './constants.js'
 
 export type ChatMessage = OpenAI.OpenAI.Chat.ChatCompletionMessageParam;
 
 export class LLMChat {
-    private _remainingTokens: number = -1;
-    private client: OpenAI.OpenAI;
-    private messages: ChatMessage[];
+    private _remainingTokens: number = -1
+    private client: OpenAI.OpenAI
+    private messages: ChatMessage[]
 
     constructor(apiKey: string, initialMessages: ChatMessage[] = [], baseURL = GROQ_BASE_URL) {
-        this.client = new OpenAI.OpenAI({ apiKey, baseURL });
-        this.messages = [...initialMessages];
+        this.client = new OpenAI.OpenAI({
+ apiKey,
+baseURL 
+})
+        this.messages = [...initialMessages]
     }
 
     get remainingTokens() {
-        return this._remainingTokens;
+        return this._remainingTokens
     }
 
     /**
      * Add a message to the chat history.
      */
-    addMessage(content: string, role: "assistant" | "system" | "user") {
-        this.messages.push({ content, role });
+    addMessage(content: string, role: 'assistant' | 'system' | 'user') {
+        this.messages.push({
+ content,
+role 
+})
     }
 
     /**
@@ -33,23 +39,26 @@ export class LLMChat {
             messages: this.messages,
             model,
             temperature,
-        }).withResponse();
+        }).withResponse()
 
-        this._remainingTokens = this.getRemainingTokensFromHeader(response.response);
+        this._remainingTokens = this.getRemainingTokensFromHeader(response.response)
 
-        const content = response.data.choices[0]?.message?.content?.trim() ?? "";
+        const content = response.data.choices[0]?.message?.content?.trim() ?? ''
         if (content) {
-            this.messages.push({ content, role: "assistant" });
+            this.messages.push({
+ content,
+role: 'assistant' 
+})
         }
 
-        return content;
+        return content
     }
 
     /**
      * Get the current chat messages.
      */
     getMessages() {
-        return [...this.messages];
+        return [...this.messages]
     }
 
     /**
@@ -57,22 +66,25 @@ export class LLMChat {
      */
     async getRemainingTokens(model = STANDARD_LLM_MODEL) {
         const response = await this.client.responses
-            .create({ input: "ping", model })
-            .withResponse();
+            .create({
+ input: 'ping',
+model 
+})
+            .withResponse()
 
-        this._remainingTokens = this.getRemainingTokensFromHeader(response.response);
-        return this._remainingTokens;
+        this._remainingTokens = this.getRemainingTokensFromHeader(response.response)
+        return this._remainingTokens
     }
 
     /**
      * Reset the chat history.
      */
     reset(messages: ChatMessage[] = []) {
-        this.messages = [...messages];
+        this.messages = [...messages]
     }
 
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins
+     
     private getRemainingTokensFromHeader(response: Response) {
-        return Number(response.headers.get("x-ratelimit-remaining-tokens")) || MAX_TOKENS;
+        return Number(response.headers.get('x-ratelimit-remaining-tokens')) || MAX_TOKENS
     }
 }

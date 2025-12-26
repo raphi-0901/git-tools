@@ -1,5 +1,5 @@
-import { render } from "ink";
-import { ReactElement } from "react";
+import { render } from 'ink'
+import { ReactElement } from 'react'
 
 export function renderInkComponent<T>(
     elementFactory: (handlers: {
@@ -11,15 +11,17 @@ export function renderInkComponent<T>(
         const { unmount } = render(
             elementFactory({
                 cancel() {
-                    unmount();
-                    resolve(null);
+                    unmount()
+                    resolve(null)
                 },
                 submit(value) {
-                    unmount();
-                    resolve(value);
+                    unmount()
+                    resolve(value)
                 }
             }),
-            { exitOnCtrlC: false }
-        );
-    });
+            {
+ exitOnCtrlC: false 
+}
+        )
+    })
 }

@@ -1,61 +1,63 @@
-import { Flags } from "@oclif/core";
-import chalk from "chalk";
+import { Flags } from '@oclif/core'
+import chalk from 'chalk'
 
-import { BaseCommand } from "../../base-commands/BaseCommand.js";
-import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
-import { renderSelectInput } from "../../ui/SelectInput.js";
-import { renderTextInput } from "../../ui/TextInput.js";
-import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
-import { checkIfFilesStaged } from "../../utils/checkIfFilesStaged.js";
-import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
-import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
-import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
-import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
-import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
-import { getSimpleGit } from "../../utils/getSimpleGit.js";
-import { countTokens } from "../../utils/gptTokenizer.js";
-import { isOnline } from "../../utils/isOnline.js";
-import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
-import * as LOGGER from "../../utils/logging.js";
-import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
-import { rewordCommit } from "../../utils/rewordCommitMessage.js";
-import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedCommitMessage.js";
-import { withPromptExit } from "../../utils/withPromptExist.js";
-import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema/autoCommitConfig.js";
+import { BaseCommand } from '../../base-commands/BaseCommand.js'
+import { renderCommitMessageInput } from '../../ui/CommitMessageInput.js'
+import { renderSelectInput } from '../../ui/SelectInput.js'
+import { renderTextInput } from '../../ui/TextInput.js'
+import { checkIfCommitExists } from '../../utils/checkIfCommitExists.js'
+import { checkIfFilesStaged } from '../../utils/checkIfFilesStaged.js'
+import { checkIfInGitRepository } from '../../utils/checkIfInGitRepository.js'
+import { promptForTextConfigValue } from '../../utils/config/promptForConfigValue.js'
+import { saveGatheredSettings } from '../../utils/config/saveGatheredSettings.js'
+import { loadMergedUserConfig } from '../../utils/config/userConfigHelpers.js'
+import { diffAnalyzer, DiffAnalyzerParams } from '../../utils/diffAnalyzer.js'
+import { getSimpleGit } from '../../utils/getSimpleGit.js'
+import { countTokens } from '../../utils/gptTokenizer.js'
+import { isOnline } from '../../utils/isOnline.js'
+import { ChatMessage, LLMChat } from '../../utils/LLMChat.js'
+import * as LOGGER from '../../utils/logging.js'
+import { obtainValidGroqApiKey } from '../../utils/obtainValidGroqApiKey.js'
+import { rewordCommit } from '../../utils/rewordCommitMessage.js'
+import { transformGeneratedCommitMessage } from '../../utils/transformGeneratedCommitMessage.js'
+import { withPromptExit } from '../../utils/withPromptExist.js'
+import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from '../../zod-schema/autoCommitConfig.js'
 
 export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitCommand> {
-    static description = "Automatically generate commit messages from staged files with feedback loop";
+    static description = 'Automatically generate commit messages from staged files with feedback loop'
     static flags = {
         reword: Flags.string({
-            description: "Rewords the commit message of the given commit. The commit hash must be provided.",
+            description: 'Rewords the commit message of the given commit. The commit hash must be provided.',
         }),
-    };
-    public readonly configId = "commit";
+    }
+    public readonly configId = 'commit'
 
     async catch(error: unknown) {
-        super.catch(error);
-        this.log(chalk.red("🚫 Commit cancelled."));
+        super.catch(error)
+        this.log(chalk.red('🚫 Commit cancelled.'))
     }
 
     async run() {
-        this.timer.start("total");
-        this.timer.start("response");
-        await checkIfInGitRepository(this);
+        this.timer.start('total')
+        this.timer.start('response')
+        await checkIfInGitRepository(this)
 
         if (this.flags.reword) {
-            const commitExists = await checkIfCommitExists(this.flags.reword);
+            const commitExists = await checkIfCommitExists(this.flags.reword)
             if (!commitExists) {
-                LOGGER.fatal(this, `Commit with hash ${this.flags.reword} does not exist.`);
+                LOGGER.fatal(this, `Commit with hash ${this.flags.reword} does not exist.`)
             }
         } else {
-            const filesStaged = await checkIfFilesStaged();
+            const filesStaged = await checkIfFilesStaged()
             if (!filesStaged) {
-                LOGGER.fatal(this, "No staged files to create a commit message.");
+                LOGGER.fatal(this, 'No staged files to create a commit message.')
             }
         }
 
-        const finalConfig = await this.getFinalConfig();
-        const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
+        const finalConfig = await this.getFinalConfig()
+        const {
+ askForSavingSettings, finalExamples, finalInstructions 
+} = finalConfig
         LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
         await isOnline(this)
@@ -64,7 +66,7 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
             remainingTokensForLLM
         } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
 
-        this.spinner.text = "Analyzing staged files for commit message generation..."
+        this.spinner.text = 'Analyzing staged files for commit message generation...'
         this.spinner.start()
 
         const initialMessages = await this.buildInitialMessages({
@@ -77,53 +79,58 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
         const tokensOfInitialMessages = countTokens(initialMessages)
         LOGGER.debug(this, `Initial messages takes ${tokensOfInitialMessages} of ${remainingTokensForLLM} tokens: ${JSON.stringify(initialMessages, null, 2)}`)
 
-        const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
+        const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages
         const diffAnalyzerParams: DiffAnalyzerParams = {
             remainingTokens: tokensForDiff,
             ...(this.flags.reword
-                    ? { commitHash: this.flags.reword, type: "reword" }
-                    : { type: "commit" }
+                    ? {
+ commitHash: this.flags.reword,
+type: 'reword' 
+}
+                    : {
+ type: 'commit' 
+}
             )
-        };
-        const diff = await diffAnalyzer(diffAnalyzerParams);
+        }
+        const diff = await diffAnalyzer(diffAnalyzerParams)
         LOGGER.debug(this, `Diff takes ${countTokens(diff)} tokens: ${diff}`)
 
         initialMessages.push({
             content: diff,
-            role: "user",
+            role: 'user',
         })
 
         const chat = new LLMChat(finalGroqApiKey, initialMessages)
 
-        let finished = false;
-        let commitMessage = "";
+        let finished = false
+        let commitMessage = ''
         while (!finished) {
-            this.spinner.text = "Generating commit message from staged files...";
+            this.spinner.text = 'Generating commit message from staged files...'
             this.spinner.start()
 
             try {
-                commitMessage = await chat.generate();
+                commitMessage = await chat.generate()
             } catch (error) {
-                LOGGER.fatal(this, "Error while generating commit message: " + error)
+                LOGGER.fatal(this, 'Error while generating commit message: ' + error)
             }
 
             LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
-            LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
+            LOGGER.debug(this, `Time taken: ${this.timer.stop('response')}`)
 
             this.spinner.stop()
 
             if (!commitMessage) {
-                LOGGER.fatal(this, "No commit message received from Groq API");
+                LOGGER.fatal(this, 'No commit message received from Groq API')
             }
 
-            finished = await this.handleUserDecision(commitMessage, chat, this.flags.reword);
-            this.timer.start("response")
+            finished = await this.handleUserDecision(commitMessage, chat, this.flags.reword)
+            this.timer.start('response')
         }
 
-        LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`)
+        LOGGER.debug(this, `Action took ${this.timer.stop('total')}.`)
 
         if (!askForSavingSettings) {
-            return;
+            return
         }
 
         await saveGatheredSettings(this, {
@@ -140,9 +147,9 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
         examples: string[],
         instructions: string,
     }) {
-        const git = getSimpleGit();
-        const branchSummary = await git.branch();
-        const currentBranch = branchSummary.current;
+        const git = getSimpleGit()
+        const branchSummary = await git.branch()
+        const currentBranch = branchSummary.current
 
         return [
             {
@@ -165,7 +172,7 @@ Strict rules:
 - NEVER invent changes that are not present in the diffs.
 - Generate a single concise commit message (one-line summary; optional body only if needed).
 `,
-                role: "system",
+                role: 'system',
             },
             {
                 content: `
@@ -173,66 +180,66 @@ Create a commit message using the following information:
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
 Examples of good Commit Messages: 
-${examples.join("\n\n")}
+${examples.join('\n\n')}
  
 Diffs of Staged Files:
                 `,
-                role: "user",
+                role: 'user',
             },
-        ] as ChatMessage[];
+        ] as ChatMessage[]
     }
 
     private async finalizeCommit(commitMessage: string | string[], rewordCommitHash?: string) {
-        const git = getSimpleGit();
+        const git = getSimpleGit()
 
-        await (rewordCommitHash ? rewordCommit(rewordCommitHash, commitMessage) : git.commit(commitMessage));
+        await (rewordCommitHash ? rewordCommit(rewordCommitHash, commitMessage) : git.commit(commitMessage))
     }
 
     private async getFinalConfig() {
-        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this);
+        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this)
 
-        let askForSavingSettings = false;
-        let finalGroqApiKey = userConfig.GROQ_API_KEY;
+        let askForSavingSettings = false
+        let finalGroqApiKey = userConfig.GROQ_API_KEY
         if (!finalGroqApiKey) {
-            LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
+            LOGGER.warn(this, 'No GROQ_API_KEY set in your config.')
             finalGroqApiKey = await promptForTextConfigValue(this, {
                 schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
-            });
+            })
 
-            askForSavingSettings = true;
+            askForSavingSettings = true
         }
 
-        let finalInstructions = userConfig.INSTRUCTIONS;
+        let finalInstructions = userConfig.INSTRUCTIONS
         if (!finalInstructions) {
-            LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
+            LOGGER.warn(this, 'No INSTRUCTIONS set in your config.')
             finalInstructions = await promptForTextConfigValue(this, {
-                currentValue: "Keep it short and conventional",
+                currentValue: 'Keep it short and conventional',
                 schema: AutoCommitConfigSchema.shape.INSTRUCTIONS
             })
 
-            askForSavingSettings = true;
+            askForSavingSettings = true
         }
 
-        let finalExamples = userConfig.EXAMPLES;
+        let finalExamples = userConfig.EXAMPLES
         if (!finalExamples) {
-            LOGGER.warn(this, "No EXAMPLES set in your config.");
+            LOGGER.warn(this, 'No EXAMPLES set in your config.')
 
             const examples = []
             while (true) {
                 const result = await withPromptExit(this, () => renderCommitMessageInput({
-                    message: "Provide some examples of commit messages you would like to generate: (leave empty if you don't want to provide any further examples)"
+                    message: 'Provide some examples of commit messages you would like to generate: (leave empty if you don\'t want to provide any further examples)'
                 }))
 
-                if (result.message.trim() === "" && result?.description.join(',').trim() === "") {
-                    break;
+                if (result.message.trim() === '' && result?.description.join(',').trim() === '') {
+                    break
                 }
 
-                const example = `${result?.message}\n${result?.description.join("\n")}`
+                const example = `${result?.message}\n${result?.description.join('\n')}`
                 examples.push(example)
             }
 
             finalExamples = examples
-            askForSavingSettings = true;
+            askForSavingSettings = true
         }
 
 
@@ -245,63 +252,75 @@ Diffs of Staged Files:
     }
 
     private async handleUserDecision(commitMessage: string, chat: LLMChat, rewordCommitHash?: string) {
-        this.log(chalk.blue("\n🤖 Suggested commit message:"));
-        this.log(`   ${chalk.green(commitMessage)}\n`);
+        this.log(chalk.blue('\n🤖 Suggested commit message:'))
+        this.log(`   ${chalk.green(commitMessage)}\n`)
 
         const decision = this.flags.yes
-            ? "accept"
+            ? 'accept'
             : await withPromptExit(this, () => renderSelectInput({
                 items: [
-                    { label: "\u{1F680} Accept and commit", value: "accept" },
-                    { label: "\u{21AA} Edit manually", value: "edit" },
-                    { label: "\u{1F501} Provide feedback", value: "feedback" },
-                    { label: "\u{1F6AB} Cancel", value: "cancel" },
+                    {
+ label: '\u{1F680} Accept and commit',
+value: 'accept' 
+},
+                    {
+ label: '\u{21AA} Edit manually',
+value: 'edit' 
+},
+                    {
+ label: '\u{1F501} Provide feedback',
+value: 'feedback' 
+},
+                    {
+ label: '\u{1F6AB} Cancel',
+value: 'cancel' 
+},
                 ] as const,
-                message: "What would you like to do?",
+                message: 'What would you like to do?',
             }))
 
         switch (decision) {
-            case "accept": {
+            case 'accept': {
                 await this.finalizeCommit(commitMessage, rewordCommitHash)
-                this.log(chalk.green("✅ Commit executed!"));
-                return true;
+                this.log(chalk.green('✅ Commit executed!'))
+                return true
             }
 
-            case "cancel": {
-                this.log(chalk.red("🚫 Commit cancelled."));
-                return true;
+            case 'cancel': {
+                this.log(chalk.red('🚫 Commit cancelled.'))
+                return true
             }
 
-            case "edit": {
-                const [firstLine, rest] = transformGeneratedCommitMessage(commitMessage);
+            case 'edit': {
+                const [firstLine, rest] = transformGeneratedCommitMessage(commitMessage)
                 const result = await withPromptExit(this, () => renderCommitMessageInput({
                     defaultValues: {
-                        description: rest?.split("\n") || [],
+                        description: rest?.split('\n') || [],
                         message: firstLine
                     },
-                    message: "Manually edit the commit message:"
+                    message: 'Manually edit the commit message:'
                 }))
 
                 await this.finalizeCommit([result.message, ...result.description], rewordCommitHash)
-                this.log(chalk.green("✅ Commit executed with custom message!"));
+                this.log(chalk.green('✅ Commit executed with custom message!'))
 
-                return true;
+                return true
             }
 
-            case "feedback": {
+            case 'feedback': {
                 const feedback = await withPromptExit(this, () => renderTextInput({
-                    message: "Provide your feedback for the LLM:",
+                    message: 'Provide your feedback for the LLM:',
                     validate(input) {
-                        if (input.trim() === "") {
-                            return "Feedback cannot be empty."
+                        if (input.trim() === '') {
+                            return 'Feedback cannot be empty.'
                         }
 
-                        return true;
+                        return true
                     }
-                }));
+                }))
 
-                chat.addMessage(feedback, "user");
-                return false;
+                chat.addMessage(feedback, 'user')
+                return false
             }
         }
     }
