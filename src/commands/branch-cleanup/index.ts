@@ -305,8 +305,13 @@ export default class BranchCleanupCommand extends BaseCommand {
             for (const branch of branchesToDelete) {
                 // Bei divergierten Branches nutzen wir -D statt -d, um das Löschen trotz fehlendem Merge zu erzwingen
                 const isDiverged = divergedBranches.has(branch) || localOnlyBranches.has(branch);
-                await git.branch([isDiverged ? "-D" : "-d", branch]);
-                LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
+                try {
+                    await git.branch([isDiverged ? "-D" : "-d", branch]);
+                    LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
+                }
+                catch (error) {
+                    LOGGER.error(this, `Error deleting branch ${branch}: ${error}`);
+                }
             }
 
             this.spinner.stop();
