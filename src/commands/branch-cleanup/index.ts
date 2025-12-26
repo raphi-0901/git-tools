@@ -23,10 +23,10 @@ export default class BranchCleanupCommand extends BaseCommand {
             description: "Show debug logs.",
         }),
     };
-public readonly configId = "branch-cleanup";
-private branchImportanceScore = new Map<string, number>();
+    public readonly configId = "branch-cleanup";
+    private branchImportanceScore = new Map<string, number>();
     private branchToLastCommitDateCache = new Map<string, number>();
-private readonly protectedBranchPatterns = [
+    private readonly protectedBranchPatterns = [
         /^main$/,
         /^master$/,
         /^development$/,
@@ -84,16 +84,13 @@ private readonly protectedBranchPatterns = [
     // Finde alle Branches, in die ein Branch gemerged wurde
     async findMergeTargets(
         sourceBranch: string,
-        allBranches: string[]
+        potentialTargets: string[]
     ): Promise<string[]> {
         const mergedInto: string[] = [];
 
-        // Prüfe nur gegen wichtigere Branches (Performance-Optimierung)
-        const potentialTargets = allBranches.filter(
-            (b) => b !== sourceBranch && Boolean(this.isProtectedBranch(b))
-        );
-
         for (const target of potentialTargets) {
+            if (target === sourceBranch) continue;
+
             const isMerged = await this.isBranchMergedInto(sourceBranch, target);
             if (isMerged) {
                 mergedInto.push(target);
@@ -101,6 +98,80 @@ private readonly protectedBranchPatterns = [
         }
 
         return mergedInto;
+    }
+
+    // Identifiziere dynamisch die wichtigsten Target-Branches
+    async identifyPotentialTargetBranches(allBranches: string[]): Promise<string[]> {
+        const git = getSimpleGit();
+        const branchStats = new Map<string, { commitCount: number; lastCommitDate: number }>();
+
+        // Sammle Statistiken für alle Branches
+        await Promise.all(
+            allBranches.map(async (branch) => {
+                try {
+                    // Zähle Commits
+                    const commitCountRaw = await git.raw(["rev-list", "--count", branch]);
+                    const commitCount = Number.parseInt(commitCountRaw.trim(), 10);
+
+                    // Letzter Commit bereits im Cache
+                    const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
+
+                    branchStats.set(branch, { commitCount, lastCommitDate });
+                } catch (error) {
+                    LOGGER.debug(this, `Error getting stats for ${branch}: ${error}`);
+                }
+            })
+        );
+
+        // Score-Berechnung für jeden Branch
+        const branchScores = allBranches.map((branch) => {
+            const stats = branchStats.get(branch);
+            if (!stats) return { branch, score: 0 };
+
+            let score = 0;
+
+            // 1. Geschützte Branches haben höchste Priorität
+            if (this.isProtectedBranch(branch)) {
+                score += 10_000;
+            }
+
+            // 2. Commit-Count (mehr Commits = wahrscheinlich wichtiger)
+            score += Math.log(stats.commitCount + 1) * 100;
+
+            // 3. Aktivität (neuere Branches wichtiger)
+            const daysSinceCommit = (Date.now() - stats.lastCommitDate) / (1000 * 60 * 60 * 24);
+            score += Math.max(0, 500 - daysSinceCommit);
+
+            // 4. Name-basierte Heuristiken
+            if (/^(main|master|production|prod)$/i.test(branch)) score += 5000;
+            else if (/^(development|develop|dev)$/i.test(branch)) score += 4000;
+            else if (/^(staging|stage)$/i.test(branch)) score += 3000;
+            else if (/^(release|hotfix)\//i.test(branch)) score += 2000;
+            else if (/^(feature|feat)\//i.test(branch)) score -= 500; // Feature-Branches weniger wichtig
+
+            return { branch, score };
+        });
+
+        // Sortiere nach Score und nimm die Top-Branches
+        const sortedBranches = branchScores
+            .sort((a, b) => b.score - a.score)
+            .map((b) => b.branch);
+
+        // Nimm die Top 10 oder alle mit Score > 1000
+        const threshold = 1000;
+        const topBranches = sortedBranches.filter((branch) => {
+            const score = branchScores.find((b) => b.branch === branch)?.score ?? 0;
+            return score > threshold;
+        });
+
+        // Mindestens die Top 5, maximal Top 15
+        const minTargets = 5;
+        const maxTargets = 15;
+        const targets = topBranches.slice(0, Math.max(minTargets, Math.min(maxTargets, topBranches.length)));
+
+        LOGGER.debug(this, `Identified ${targets.length} potential target branches: ${targets.join(", ")}`);
+
+        return targets;
     }
 
     // Prüfe ob Branch A vollständig in Branch B gemerged wurde
@@ -157,13 +228,16 @@ private readonly protectedBranchPatterns = [
         this.spinner.text = "Analyzing branch activity...";
         await this.buildLastCommitCache(allBranches);
 
+        this.spinner.text = "Identifying important target branches...";
+        const potentialTargets = await this.identifyPotentialTargetBranches(allBranches);
+
         this.spinner.text = "Detecting merged branches...";
         const mergedBranches = new Map<string, MergeInfo>();
 
         // Parallel verarbeiten für bessere Performance
         await Promise.all(
             candidateBranches.map(async (branch) => {
-                const mergedInto = await this.findMergeTargets(branch, allBranches);
+                const mergedInto = await this.findMergeTargets(branch, potentialTargets);
 
                 if (mergedInto.length > 0) {
                     const mostRelevant = this.selectMostRelevantBranch(mergedInto);
@@ -176,7 +250,7 @@ private readonly protectedBranchPatterns = [
                     });
                 }
             })
-        );  
+        );
 
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`);
@@ -220,11 +294,11 @@ private readonly protectedBranchPatterns = [
         const branchesToDelete = this.flags.yes
             ? []
             : await withPromptExit(this, () =>
-            renderCheckboxList({
-                items,
-                message: "Wähle die Branches aus, die du löschen möchtest:",
-            })
-        );
+                renderCheckboxList({
+                    items,
+                    message: "Wähle die Branches aus, die du löschen möchtest:",
+                })
+            );
 
         if (branchesToDelete.length > 0) {
             this.spinner.start();
