@@ -235,15 +235,15 @@ export default class BranchCleanupCommand extends BaseCommand {
                     if (!hasRemote) {
                         localOnlyBranches.set(branch, lastCommitDate);
                     } else if (ahead > 0 && behind > 0) {
-                        // Diverged: Hat eigene Arbeit, hinkt aber hinterher
+                        // Diverged: Has local changes but behind remote
                         if (daysSinceCommit > 30) {
                             divergedBranches.set(branch, { ahead, behind, lastCommitDate });
                         }
                     } else if (behind > 0 && ahead === 0) {
                         behindOnlyBranches.set(branch, { behindCount: behind, lastCommitDate });
                     } else if (ahead === 0 && behind === 0 && daysSinceCommit > 30) {
-                            staleBranches.set(branch, lastCommitDate);
-                        }
+                        staleBranches.set(branch, lastCommitDate);
+                    }
                 }
             })
         );
@@ -258,7 +258,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         const items: ListItem<string>[] = [];
 
         if (mergedBranches.size > 0) {
-            items.push({ label: `Gemergte Branches (${mergedBranches.size})`, type: "separator" });
+            items.push({ label: `Merged Branches (${mergedBranches.size})`, type: "separator" });
             const sorted = [...mergedBranches.entries()].sort((a, b) => (this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0) - (this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0));
             items.push(...sorted.map(([branch, info]) => ({
                 key: branch, label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(info.mostRelevantBranch)} ${chalk.dim(`(${dayjs(info.lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
@@ -266,20 +266,20 @@ export default class BranchCleanupCommand extends BaseCommand {
         }
 
         if (behindOnlyBranches.size > 0) {
-            items.push({ label: `Nur ausstehende Pulls (Behind)`, type: "separator" });
+            items.push({ label: `Only pending pulls (Behind)`, type: "separator" });
             items.push(...[...behindOnlyBranches.entries()].map(([branch, info]) => ({
-                key: branch, label: `${chalk.blue(branch)} ${chalk.dim(`(↓${info.behindCount}, aktiv: ${dayjs(info.lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+                key: branch, label: `${chalk.blue(branch)} ${chalk.dim(`(↓${info.behindCount}, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
             })));
         }
 
         if (divergedBranches.size > 0) {
-            items.push({ label: `Veraltete & Divergierte Branches (ACHTUNG: Lokale Änderungen!)`, type: "separator" });
+            items.push({ label: `Outdated & Diverged Branches (WARNING: Local changes!)`, type: "separator" });
             items.push(...[...divergedBranches.entries()].map(([branch, info]) => {
                 const aheadColor = info.ahead > 10 ? chalk.red : chalk.yellow;
                 const behindColor = info.behind > 50 ? chalk.red : chalk.blue;
                 return {
                     key: branch,
-                    label: `${chalk.red.bold(branch)} ${chalk.dim("(")}${aheadColor(`↑${info.ahead}`)} ${behindColor(`↓${info.behind}`)}${chalk.dim(`, aktiv: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
+                    label: `${chalk.red.bold(branch)} ${chalk.dim("(")}${aheadColor(`↑${info.ahead}`)} ${behindColor(`↓${info.behind}`)}${chalk.dim(`, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
                     type: "item" as const,
                     value: branch
                 };
@@ -287,23 +287,23 @@ export default class BranchCleanupCommand extends BaseCommand {
         }
 
         if (localOnlyBranches.size > 0) {
-            items.push({ label: `Lokale Branches ohne Remote`, type: "separator" }, ...[...localOnlyBranches.entries()].map(([branch, lastCommitDate]) => ({
-                key: branch, label: `${chalk.magenta(branch)} ${chalk.dim(`(Nur lokal, aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            items.push({ label: `Local branches without remote`, type: "separator" }, ...[...localOnlyBranches.entries()].map(([branch, lastCommitDate]) => ({
+                key: branch, label: `${chalk.magenta(branch)} ${chalk.dim(`(Local only, active: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
             })));
         }
 
         if (staleBranches.size > 0) {
-            items.push({ label: `Veraltete Branches (>30 Tage, synchron)`, type: "separator" }, ...[...staleBranches.entries()].map(([branch, lastCommitDate]) => ({
-                key: branch, label: `${chalk.gray(branch)} ${chalk.dim(`(Synchron, aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            items.push({ label: `Stale branches (>30 days, synced)`, type: "separator" }, ...[...staleBranches.entries()].map(([branch, lastCommitDate]) => ({
+                key: branch, label: `${chalk.gray(branch)} ${chalk.dim(`(Synced, active: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
             })));
         }
 
-        const branchesToDelete = await withPromptExit(this, () => renderCheckboxList({ items, message: "Wähle Branches zum Löschen:" }));
+        const branchesToDelete = await withPromptExit(this, () => renderCheckboxList({ items, message: "Select branches to delete:" }));
 
         if (branchesToDelete.length > 0) {
             this.spinner.start();
             for (const branch of branchesToDelete) {
-                // Bei divergierten Branches nutzen wir -D statt -d, um das Löschen trotz fehlendem Merge zu erzwingen
+                // For diverged branches we use -D instead of -d to force delete despite missing merge
                 const isDiverged = divergedBranches.has(branch) || localOnlyBranches.has(branch);
                 try {
                     await git.branch([isDiverged ? "-D" : "-d", branch]);
