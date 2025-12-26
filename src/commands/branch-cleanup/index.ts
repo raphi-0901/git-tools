@@ -107,15 +107,18 @@ export default class BranchCleanupCommand extends BaseCommand {
         return mergedInto;
     }
 
-    // NEU: Prüft ob der Branch hinter dem Remote liegt, aber keine eigenen Änderungen (Ahead) hat
-    async getRemoteStatus(branch: string): Promise<{ ahead: number; behind: number }> {
+    // Prüft den Remote-Status und ob überhaupt ein Upstream existiert
+    async getRemoteStatus(branch: string): Promise<{ ahead: number; behind: number; hasRemote: boolean }> {
         const git = getSimpleGit();
         try {
+            // Prüfen ob der Remote Branch überhaupt existiert
+            await git.raw(["rev-parse", "--verify", `origin/${branch}`]);
+
             const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
             const [ahead, behind] = status.trim().split("\t").map(n => Number.parseInt(n, 10));
-            return { ahead, behind };
+            return { ahead, behind, hasRemote: true };
         } catch {
-            return { ahead: 0, behind: 0 };
+            return { ahead: 0, behind: 0, hasRemote: false };
         }
     }
 
@@ -303,6 +306,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         const mergedBranches = new Map<string, MergeInfo>();
         const staleBranches = new Map<string, number>();
         const behindOnlyBranches = new Map<string, { behindCount: number; lastCommitDate: number; }>();
+        const localOnlyBranches = new Map<string, number>();
 
         await Promise.all(
             candidateBranches.map(async (branch) => {
@@ -317,11 +321,12 @@ export default class BranchCleanupCommand extends BaseCommand {
                         mostRelevantBranch: mostRelevant,
                     });
                 } else {
-                    const { ahead, behind } = await this.getRemoteStatus(branch);
+                    const { ahead, behind, hasRemote } = await this.getRemoteStatus(branch);
 
-                    LOGGER.debug(this, `Branch ${branch} is ${ahead} commits ahead and ${behind} behind remote.`);
-
-                    if (behind > 0 && ahead === 0) {
+                    if (!hasRemote) {
+                        // Branch existiert nur lokal und wurde nicht gemerged
+                        localOnlyBranches.set(branch, lastCommitDate);
+                    } else if (behind > 0 && ahead === 0) {
                         // Branch hat nur ausstehende Pulls
                         behindOnlyBranches.set(branch, { behindCount: behind, lastCommitDate });
                     } else if (ahead === 0 && behind === 0) {
@@ -338,7 +343,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`);
 
-        if (mergedBranches.size === 0 && staleBranches.size === 0 && behindOnlyBranches.size === 0) {
+        if (mergedBranches.size === 0 && staleBranches.size === 0 && behindOnlyBranches.size === 0 && localOnlyBranches.size === 0) {
             LOGGER.log(this, "✅ No cleanup candidates found. Repository is clean!");
             this.logTotalTime();
             return;
@@ -388,6 +393,22 @@ export default class BranchCleanupCommand extends BaseCommand {
             })));
         }
 
+        if (localOnlyBranches.size > 0) {
+            items.push({
+                label: `Lokale Branches ohne Remote (nicht gemergt)`,
+                type: "separator" as const,
+            });
+
+            const sortedLocal = [...localOnlyBranches.entries()].sort((a, b) => b[1] - a[1]);
+
+            items.push(...sortedLocal.map(([branch, lastCommitDate]) => ({
+                key: branch,
+                label: `${chalk.magenta(branch)} ${chalk.dim(`(Nur lokal, zuletzt aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`,
+                type: "item" as const,
+                value: branch,
+            })));
+        }
+
         if (staleBranches.size > 0) {
             items.push({
                 label: `Veraltete Branches (nicht gemergt, aber synchron mit Remote, >30 Tage alt)`,
@@ -418,7 +439,7 @@ export default class BranchCleanupCommand extends BaseCommand {
             this.spinner.text = `Deleting ${branchesToDelete.length} branches...`;
 
             for (const branch of branchesToDelete) {
-                await git.deleteLocalBranch(branch);
+                await git.deleteLocalBranch(branch, true);
                 LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
             }
 
