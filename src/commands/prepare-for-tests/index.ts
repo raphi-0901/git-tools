@@ -15,6 +15,7 @@ import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { SIGINT_ERROR_NUMBER } from "../../utils/constants.js";
 import { gatherAutoBranchConfigForHostname } from "../../utils/gatherAutoBranchConfigForHostname.js";
 import { getSchemaForUnionOfAutoBranch } from "../../utils/getSchemaForUnionOfAutoBranch.js";
+import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
@@ -45,6 +46,16 @@ export default class PrepareForTestsCommand extends BaseCommand {
     async run() {
         const { flags } = await this.parse(PrepareForTestsCommand);
         await checkIfInGitRepository(this);
+
+        const git = getSimpleGit();
+        const status = await git.status();
+
+        if (!status.isClean()) {
+            LOGGER.fatal(
+                this,
+                "Working directory is not clean. Please commit or stash your changes before running this command."
+            );
+        }
 
         const isDate = Date.parse(flags.time);
         if (Number.isNaN(isDate)) {
