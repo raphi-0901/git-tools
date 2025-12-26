@@ -46,9 +46,8 @@ export function error(ctx: BaseCommand, message: string): void {
  * Fatal error logs (terminates command).
  */
 export function fatal(ctx: BaseCommand, message: string): never {
-    withSpinner(ctx, () => {
-        ctx.log(`${chalk.red.bold("💥 FATAL:")} ${chalk.red(message)}`);
-    });
+    ctx.spinner.stop(); // stop spinner to avoid unnecessary newlines
+    ctx.log(`${chalk.red.bold("💥 FATAL:")} ${chalk.red(message)}`);
 
     return ctx.exit(FATAL_ERROR_NUMBER);
 }
