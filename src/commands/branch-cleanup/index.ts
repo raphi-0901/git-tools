@@ -245,7 +245,13 @@ export default class BranchCleanupCommand extends BaseCommand {
 
         this.spinner.start();
         this.spinner.text = "Fetching repository...";
-        await git.fetch(['--all']); // Fetch von ALLEN remotes
+        try {
+            await git.fetch(['--all']); // Fetch von ALLEN remotes
+        }
+        catch(error) {
+            LOGGER.warn(this, `Error fetching repository. Will try to continue without it.`);
+            LOGGER.debug(this, `Error fetching repository: ${error}`);
+        }
 
         this.spinner.text = "Loading branches...";
         const allBranches = (await git.branchLocal()).all;
