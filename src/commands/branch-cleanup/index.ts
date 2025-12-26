@@ -214,7 +214,6 @@ export default class BranchCleanupCommand extends BaseCommand {
         try {
             // Git kann direkt prüfen ob ein Branch gemerged wurde
             // Wenn die Ausgabe leer ist, wurde der Branch NICHT gemerged
-            // Funktioniert auch mit remote branches (z.B. origin/main)
             const result = await git.raw([
                 "log",
                 `${targetBranch}..${sourceBranch}`,
@@ -232,6 +231,18 @@ export default class BranchCleanupCommand extends BaseCommand {
         return this.protectedBranchPatterns.some((r) => r.test(branch));
     }
 
+    // Prüft, ob der lokale Branch exakt auf dem Stand des Remotes ist
+    async isUpToDateWithRemote(branch: string): Promise<boolean> {
+        const git = getSimpleGit();
+        try {
+            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
+            // Status Format: "0\t0" (ahead\tbehind)
+            return status.trim() === "0\t0";
+        } catch {
+            return false;
+        }
+    }
+
     logTotalTime() {
         LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`);
     }
@@ -246,7 +257,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.start();
         this.spinner.text = "Fetching repository...";
         try {
-            await git.fetch(['--all']); // Fetch von ALLEN remotes
+            await git.fetch(['--all']);
         }
         catch(error) {
             LOGGER.warn(this, `Error fetching repository. Will try to continue without it.`);
@@ -256,10 +267,9 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.text = "Loading branches...";
         const allBranches = (await git.branchLocal()).all;
 
-        // Lade auch remote branches
         const remoteBranchesRaw = (await git.branch(['-r'])).all;
         const remoteBranches = remoteBranchesRaw
-            .filter(b => !b.includes('HEAD ->')) // Filter HEAD pointer
+            .filter(b => !b.includes('HEAD ->'))
             .map(b => b.trim());
 
         LOGGER.debug(this, `Local branches: ${allBranches.length}, Remote branches: ${remoteBranches.length}`);
@@ -267,8 +277,6 @@ export default class BranchCleanupCommand extends BaseCommand {
         const candidateBranches = allBranches.filter(
             (b) => !this.isProtectedBranch(b)
         );
-
-        LOGGER.debug(this, `${candidateBranches.length} candidate branches`);
 
         this.spinner.text = "Analyzing branch activity...";
         await this.buildLastCommitCache(allBranches);
@@ -279,23 +287,31 @@ export default class BranchCleanupCommand extends BaseCommand {
             remoteBranches
         );
 
-        this.spinner.text = "Detecting merged branches...";
+        this.spinner.text = "Detecting branch states...";
         const mergedBranches = new Map<string, MergeInfo>();
+        const staleBranches = new Map<string, number>();
 
-        // Parallel verarbeiten für bessere Performance
         await Promise.all(
             candidateBranches.map(async (branch) => {
                 const mergedInto = await this.findMergeTargets(branch, potentialTargets);
+                const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
 
                 if (mergedInto.length > 0) {
                     const mostRelevant = this.selectMostRelevantBranch(mergedInto);
-                    const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
-
                     mergedBranches.set(branch, {
                         lastCommitDate,
                         mergedIntoBranches: mergedInto,
                         mostRelevantBranch: mostRelevant,
                     });
+                } else {
+                    // Check for stale but up-to-date branches
+                    const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
+                    if (daysSinceCommit > 30) {
+                        const isSynced = await this.isUpToDateWithRemote(branch);
+                        if (isSynced) {
+                            staleBranches.set(branch, lastCommitDate);
+                        }
+                    }
                 }
             })
         );
@@ -303,41 +319,55 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`);
 
-        if (mergedBranches.size === 0) {
-            LOGGER.log(this, "✅ No merged branches found. Repository is clean!");
+        if (mergedBranches.size === 0 && staleBranches.size === 0) {
+            LOGGER.log(this, "✅ No cleanup candidates found. Repository is clean!");
             this.logTotalTime();
             return;
         }
 
-        // Sortiere nach Relevanz des Ziel-Branches
-        const sortedBranches = [...mergedBranches.entries()].sort((a, b) => {
-            const scoreA = this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0;
-            const scoreB = this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0;
-            return scoreB - scoreA;
-        });
+        const items: ListItem<string>[] = [];
 
-        const items: ListItem<string>[] = [
-            {
+        if (mergedBranches.size > 0) {
+            items.push({
                 label: `Gemergte Branches (${mergedBranches.size} gefunden)`,
                 type: "separator" as const,
-            },
-            ...sortedBranches.map(([branch, info]) => {
+            });
+
+            const sortedMerged = [...mergedBranches.entries()].sort((a, b) => {
+                const scoreA = this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0;
+                const scoreB = this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0;
+                return scoreB - scoreA;
+            });
+
+            items.push(...sortedMerged.map(([branch, info]) => {
                 const targetList = info.mergedIntoBranches.length > 1
                     ? `${info.mostRelevantBranch} (+${info.mergedIntoBranches.length - 1} weitere)`
                     : info.mostRelevantBranch;
-
                 const timeAgo = dayjs(info.lastCommitDate).fromNow();
-
                 return {
                     key: branch,
-                    label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(
-                        targetList
-                    )} ${chalk.dim(`(${timeAgo})`)}`,
+                    label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(targetList)} ${chalk.dim(`(${timeAgo})`)}`,
                     type: "item" as const,
                     value: branch,
                 };
-            }),
-        ];
+            }));
+        }
+
+        if (staleBranches.size > 0) {
+            items.push({
+                label: `Veraltete Branches (nicht gemergt, aber synchron mit Remote, >30 Tage alt)`,
+                type: "separator" as const,
+            });
+
+            const sortedStale = [...staleBranches.entries()].sort((a, b) => a[1] - b[1]);
+
+            items.push(...sortedStale.map(([branch, lastCommitDate]) => ({
+                key: branch,
+                label: `${chalk.red(branch)} ${chalk.dim(`(Zuletzt aktiv: ${dayjs(lastCommitDate).fromNow()})`)}`,
+                type: "item" as const,
+                value: branch,
+            })));
+        }
 
         const branchesToDelete = this.flags.yes
             ? []
