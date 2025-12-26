@@ -1,1 +1,8 @@
-"@oclif/prettier-config"
+{
+  "...": "@oclif/prettier-config",
+  "bracketSpacing": true,
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 4,
+  "printWidth": 150
+}
