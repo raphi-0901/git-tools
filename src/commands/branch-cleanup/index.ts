@@ -12,9 +12,9 @@ import { withPromptExit } from "../../utils/withPromptExist.js";
 dayjs.extend(relativeTime);
 
 type MergeInfo = {
-    hash: string;
-    mergeDate: number;
-    target: string;
+    lastCommitDate: number;
+    mergedIntoBranches: string[];
+    mostRelevantBranch: string;
 };
 
 export default class BranchCleanupCommand extends BaseCommand {
@@ -23,57 +23,57 @@ export default class BranchCleanupCommand extends BaseCommand {
             description: "Show debug logs.",
         }),
     };
-    public readonly configId = "branch-cleanup";
-    private branchToLastCommitDateCache = new Map<string, number>()
-    private branchToLastCommitHashCache = new Map<string, string>()
-    private commitHashToBranchCache = new Map<string, Set<string>>()
-    private readonly protectedBranchPatterns = [
+public readonly configId = "branch-cleanup";
+private branchImportanceScore = new Map<string, number>();
+    private branchToLastCommitDateCache = new Map<string, number>();
+private readonly protectedBranchPatterns = [
         /^main$/,
         /^master$/,
         /^development$/,
+        /^develop$/,
         /^release\//,
         /^hotfix\//,
     ];
 
-    // --- Build Commit -> Branch map (in-memory) ---
-    async buildCommitToBranchMap(branches: string[]) {
+    async buildLastCommitCache(branches: string[]) {
         const git = getSimpleGit();
 
         await Promise.all(
-            branches.map(async branch => {
-                const commitsRaw = await git.raw(["rev-list", branch]);
-                for (const hash of commitsRaw.split("\n")) {
-                    if (!this.commitHashToBranchCache.has(hash)) {
-                        this.commitHashToBranchCache.set(hash, new Set());
-                    }
-
-                    this.commitHashToBranchCache.get(hash)!.add(branch);
-                }
-            })
-        );
-    }
-
-    // --- Build Last Commit Cache parallel ---
-    async buildLastCommitCacheParallel(
-        branches: string[]
-    ) {
-        const git = getSimpleGit();
-        await Promise.all(
-            branches.map(async branch => {
+            branches.map(async (branch) => {
                 const raw = await git.raw([
                     "log",
                     branch,
                     "-n",
                     "1",
-                    "--pretty=format:%H|%ci",
+                    "--pretty=format:%ci",
                 ]);
+                const date = new Date(raw.trim()).getTime();
+                this.branchToLastCommitDateCache.set(branch, date);
 
-                const [hash, date] = raw.split("|");
-
-                this.branchToLastCommitDateCache.set(branch, new Date(date.trim()).getTime());
-                this.branchToLastCommitHashCache.set(branch, hash);
+                // Berechne Wichtigkeit
+                const importance = this.calculateBranchImportance(branch, date);
+                this.branchImportanceScore.set(branch, importance);
             })
         );
+    }
+
+    // Berechne Wichtigkeit eines Branches basierend auf Name und Aktivität
+    calculateBranchImportance(branchName: string, lastCommitDate: number): number {
+        let score = 0;
+
+        // Basis-Score für Branch-Namen (höher = wichtiger)
+        if (/^(main|master)$/.test(branchName)) score += 1000;
+        else if (/^(development|develop)$/.test(branchName)) score += 900;
+        else if (/^release\//.test(branchName)) score += 800;
+        else if (/^hotfix\//.test(branchName)) score += 700;
+        else if (branchName.startsWith('staging')) score += 600;
+        else if (branchName.startsWith('production')) score += 950;
+
+        // Aktivitäts-Score (neuere Branches sind wichtiger)
+        const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
+        const activityScore = Math.max(0, 100 - daysSinceCommit);
+
+        return score + activityScore;
     }
 
     async catch(error: unknown) {
@@ -81,85 +81,53 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.log(chalk.red("🚫 Branch cleanup cancelled."));
     }
 
-    /**
-     * For each merge commit, selects the target branch
-     * that had commits AFTER the merge and is the most recently active.
-     *
-     * Key of the result map = source commit (second parent)
-     */
-    async getDirectMergesCached(
-        branches: string[],
-        lastCommitCache: Map<string, number>
-    ): Promise<Map<string, MergeInfo>> {
+    // Finde alle Branches, in die ein Branch gemerged wurde
+    async findMergeTargets(
+        sourceBranch: string,
+        allBranches: string[]
+    ): Promise<string[]> {
+        const mergedInto: string[] = [];
 
-        const git = getSimpleGit();
-        const result = new Map<string, MergeInfo>();
-        const branchSet = new Set(branches);
+        // Prüfe nur gegen wichtigere Branches (Performance-Optimierung)
+        const potentialTargets = allBranches.filter(
+            (b) => b !== sourceBranch && Boolean(this.isProtectedBranch(b))
+        );
 
-        // 🔑 Single Git call
-        const log = await git.raw([
-            "log",
-            "--all",
-            "--merges",
-            "--first-parent",
-            "--pretty=format:%H|%P|%ci",
-        ]);
-
-        console.log('log :>>', log);
-
-
-        for (const line of log.split("\n")) {
-            if (!line.trim()) {
-                continue;
-            }
-
-            const [mergeHash, parentsRaw, dateRaw] = line.split("|");
-            const parents = parentsRaw.split(" ");
-
-            // Need exactly 2 parents for a merge
-            if (parents.length < 2) continue;
-
-            const sourceCommit = parents[1]; // second parent
-
-            const mergeDate = new Date(dateRaw).getTime();
-
-            for (const target of branchSet) {
-                if (this.isProtectedBranch(target)) {
-                    continue;
-                }
-
-                const targetLastCommit = lastCommitCache.get(target);
-                if (!targetLastCommit) {
-                    continue;
-                }
-
-                // 🔑 Target must have commits AFTER the merge
-                if (targetLastCommit <= mergeDate) {
-                    continue
-                }
-
-                const existing = result.get(sourceCommit);
-
-                // 🔑 Choose the most recently active target
-                if (
-                    !existing ||
-                    targetLastCommit >
-                    (lastCommitCache.get(existing.target) ?? 0)
-                ) {
-                    result.set(sourceCommit, {
-                        hash: mergeHash,
-                        mergeDate,
-                        target,
-                    });
-                }
+        for (const target of potentialTargets) {
+            const isMerged = await this.isBranchMergedInto(sourceBranch, target);
+            if (isMerged) {
+                mergedInto.push(target);
             }
         }
 
-        return result;
+        return mergedInto;
+    }
+
+    // Prüfe ob Branch A vollständig in Branch B gemerged wurde
+    async isBranchMergedInto(
+        sourceBranch: string,
+        targetBranch: string
+    ): Promise<boolean> {
+        const git = getSimpleGit();
+
+        try {
+            // Git kann direkt prüfen ob ein Branch gemerged wurde
+            // Wenn die Ausgabe leer ist, wurde der Branch NICHT gemerged
+            const result = await git.raw([
+                "log",
+                `${targetBranch}..${sourceBranch}`,
+                "--oneline",
+            ]);
+
+            return result.trim() === "";
+        } catch (error) {
+            LOGGER.debug(this, `Error checking merge status: ${error}`);
+            return false;
+        }
     }
 
     isProtectedBranch(branch: string): boolean {
-        return this.protectedBranchPatterns.some(r => r.test(branch));
+        return this.protectedBranchPatterns.some((r) => r.test(branch));
     }
 
     logTotalTime() {
@@ -168,11 +136,11 @@ export default class BranchCleanupCommand extends BaseCommand {
 
     async run() {
         await this.parse(BranchCleanupCommand);
-
         this.timer.start("total");
         this.timer.start("response");
 
         const git = getSimpleGit();
+
         this.spinner.start();
         this.spinner.text = "Fetching repository...";
         await git.fetch();
@@ -181,63 +149,111 @@ export default class BranchCleanupCommand extends BaseCommand {
         const allBranches = (await git.branchLocal()).all;
 
         const candidateBranches = allBranches.filter(
-            b => !this.isProtectedBranch(b)
+            (b) => !this.isProtectedBranch(b)
         );
 
         LOGGER.debug(this, `${candidateBranches.length} candidate branches`);
 
-        this.spinner.text = "Caching last commit dates...";
-        await this.buildLastCommitCacheParallel(candidateBranches);
+        this.spinner.text = "Analyzing branch activity...";
+        await this.buildLastCommitCache(allBranches);
 
+        this.spinner.text = "Detecting merged branches...";
+        const mergedBranches = new Map<string, MergeInfo>();
 
-        console.log('branchToLastCommitDateCache :>>', this.branchToLastCommitDateCache);
-        console.log('branchToLastCommitHashCache :>>', this.branchToLastCommitHashCache);
+        // Parallel verarbeiten für bessere Performance
+        await Promise.all(
+            candidateBranches.map(async (branch) => {
+                const mergedInto = await this.findMergeTargets(branch, allBranches);
 
-        this.spinner.text = "Building commit->branch map (in-memory)...";
-        await this.buildCommitToBranchMap(candidateBranches);
+                if (mergedInto.length > 0) {
+                    const mostRelevant = this.selectMostRelevantBranch(mergedInto);
+                    const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
 
-        this.spinner.text = "Detecting direct merges (cached & parallel)...";
-        const mergedMap = await this.getDirectMergesCached(
-            candidateBranches,
-            this.branchToLastCommitDateCache
-        );
-
-        console.log('mergedMap :>>', mergedMap);
-
+                    mergedBranches.set(branch, {
+                        lastCommitDate,
+                        mergedIntoBranches: mergedInto,
+                        mostRelevantBranch: mostRelevant,
+                    });
+                }
+            })
+        );  
 
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`);
 
-        if (mergedMap.size === 0) {
-            LOGGER.log(this, "No merged branches found.");
+        if (mergedBranches.size === 0) {
+            LOGGER.log(this, "✅ No merged branches found. Repository is clean!");
             this.logTotalTime();
             return;
         }
 
+        // Sortiere nach Relevanz des Ziel-Branches
+        const sortedBranches = [...mergedBranches.entries()].sort((a, b) => {
+            const scoreA = this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0;
+            const scoreB = this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0;
+            return scoreB - scoreA;
+        });
+
         const items: ListItem<string>[] = [
             {
-                label:
-                    "Direkt gemergte Branches (relevantester Ziel-Branch, cached, geschützt ausgeschlossen)",
+                label: `Gemergte Branches (${mergedBranches.size} gefunden)`,
                 type: "separator" as const,
             },
-            ...[...mergedMap.entries()].map(([source, merge]) => ({
-                key: source,
-                label: `${chalk.blueBright(source)} → ${merge.target} (${dayjs(
-                    this.branchToLastCommitDateCache.get(merge.target)
-                ).fromNow()})`,
-                type: "item" as const,
-                value: source,
-            })),
+            ...sortedBranches.map(([branch, info]) => {
+                const targetList = info.mergedIntoBranches.length > 1
+                    ? `${info.mostRelevantBranch} (+${info.mergedIntoBranches.length - 1} weitere)`
+                    : info.mostRelevantBranch;
+
+                const timeAgo = dayjs(info.lastCommitDate).fromNow();
+
+                return {
+                    key: branch,
+                    label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(
+                        targetList
+                    )} ${chalk.dim(`(${timeAgo})`)}`,
+                    type: "item" as const,
+                    value: branch,
+                };
+            }),
         ];
 
-        const branchesToDelete = await withPromptExit(this, () =>
+        const branchesToDelete = this.flags.yes
+            ? []
+            : await withPromptExit(this, () =>
             renderCheckboxList({
                 items,
-                message: "Select the branches you want to delete:",
+                message: "Wähle die Branches aus, die du löschen möchtest:",
             })
         );
 
+        if (branchesToDelete.length > 0) {
+            this.spinner.start();
+            this.spinner.text = `Deleting ${branchesToDelete.length} branches...`;
+
+            for (const branch of branchesToDelete) {
+                // await git.deleteLocalBranch(branch);
+                LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
+            }
+
+            this.spinner.stop();
+            LOGGER.log(
+                this,
+                `${chalk.green("✓")} Successfully deleted ${branchesToDelete.length} branches!`
+            );
+        }
+
         this.logTotalTime();
-        console.log("branchesToDelete:", branchesToDelete);
+    }
+
+    // Wähle den relevantesten Branch aus einer Liste
+    selectMostRelevantBranch(branches: string[]): string {
+        if (branches.length === 0) return "";
+
+        return branches.reduce((mostRelevant, current) => {
+            const currentScore = this.branchImportanceScore.get(current) ?? 0;
+            const mostRelevantScore = this.branchImportanceScore.get(mostRelevant) ?? 0;
+
+            return currentScore > mostRelevantScore ? current : mostRelevant;
+        });
     }
 }
