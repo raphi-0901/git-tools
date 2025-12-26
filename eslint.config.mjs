@@ -15,61 +15,86 @@ export default [
         files: ['*.ts', '*.tsx'],
         rules: {
             '@typescript-eslint/consistent-type-assertions': 'error',
-            '@typescript-eslint/member-delimiter-style': ['error', {
-                multiline: {
-                    delimiter: 'none',
-                    requireLast: false,
+            '@typescript-eslint/member-delimiter-style': [
+                'error',
+                {
+                    multiline: {
+                        delimiter: 'none',
+                        requireLast: false,
+                    },
+                    singleline: {
+                        delimiter: 'semi',
+                        requireLast: false,
+                    },
                 },
-                singleline: {
-                    delimiter: 'semi',
-                    requireLast: false,
-                },
-            }],
-            '@typescript-eslint/no-unused-vars': ['error', {
-                argsIgnorePattern: '^_',
-            }],
+            ],
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
             '@typescript-eslint/strict-boolean-expressions': 'warn',
         },
     },
     {
         files: ['**/*'],
         rules: {
-            '@stylistic/brace-style': ['error', '1tbs', {
-                allowSingleLine: false,
-            }],
-            '@stylistic/comma-dangle': ['error', 'only-multiline'],
-            '@stylistic/comma-spacing': ['error', {
-                after: true,
-                before: false,
-            }],
+            '@stylistic/array-bracket-newline': ['error', { multiline: true }],
+            '@stylistic/array-element-newline': [
+                'error',
+                {
+                    minItems: 3,
+                    multiline: true,
+                },
+            ],
+            '@stylistic/brace-style': [
+                'error',
+                '1tbs',
+                { allowSingleLine: false },
+            ],
+            '@stylistic/comma-dangle': ['error', 'always-multiline'],
+            '@stylistic/comma-spacing': [
+                'error',
+                {
+                    after: true,
+                    before: false,
+                },
+            ],
             '@stylistic/indent': ['error', 4],
-            '@stylistic/key-spacing': ['error', {
-                beforeColon: false,
-            }],
-            '@stylistic/max-len': ['warn', {
-                code: 150,
-            }],
-            '@stylistic/max-statements-per-line': ['error', {
-                max: 1
-            }],
+            '@stylistic/key-spacing': ['error', { beforeColon: false }],
+            '@stylistic/max-len': [
+                'warn',
+                {
+                    code: 150,
+                    ignoreComments: true,
+                    ignoreStrings: true,
+                    ignoreTemplateLiterals: true,
+                    ignoreUrls: true,
+
+                },
+            ],
+            '@stylistic/max-statements-per-line': ['error', { max: 1 }],
             '@stylistic/no-confusing-arrow': 'error',
             '@stylistic/no-mixed-spaces-and-tabs': 'error',
             '@stylistic/no-multi-spaces': 'error',
             '@stylistic/no-multiple-empty-lines': 'error',
             '@stylistic/no-trailing-spaces': 'error',
             '@stylistic/no-whitespace-before-property': 'error',
-            '@stylistic/object-curly-newline': ['error', {
-                ExportDeclaration: {
-                    minProperties: 3,
-                    multiline: true,
+            '@stylistic/object-curly-newline': [
+                'error',
+                {
+                    ExportDeclaration: {
+                        minProperties: 3,
+                        multiline: true,
+                    },
+                    ImportDeclaration: 'never',
+                    ObjectExpression: {
+                        minProperties: 3,
+                        multiline: true,
+                    },
+                    ObjectPattern: {
+                        minProperties: 3,
+                        multiline: true,
+                    },
                 },
-                ImportDeclaration: 'never',
-                ObjectExpression: 'always',
-                ObjectPattern: {
-                    minProperties: 3,
-                    multiline: true,
-                },
-            }],
+            ],
+
             '@stylistic/object-curly-spacing': ['error', 'always'],
             '@stylistic/object-property-newline': 'error',
             '@stylistic/operator-linebreak': ['error', 'before'],
@@ -91,14 +116,17 @@ export default [
             'no-await-in-loop': 'off',
             'no-console': 'warn',
             'no-nested-ternary': 'error',
-            'prefer-const': ['error', {
-                destructuring: 'all',
-                ignoreReadBeforeAssign: true,
-            }],
+            'prefer-const': [
+                'error',
+                {
+                    destructuring: 'all',
+                    ignoreReadBeforeAssign: true,
+                },
+            ],
 
             'unicorn/filename-case': 'off',
             'unicorn/no-array-reduce': 'off',
             'unicorn/prevent-abbreviations': 'off',
         },
-    }
+    },
 ]
