@@ -107,6 +107,18 @@ export default class BranchCleanupCommand extends BaseCommand {
         return mergedInto;
     }
 
+    // NEU: Prüft ob der Branch hinter dem Remote liegt, aber keine eigenen Änderungen (Ahead) hat
+    async getRemoteStatus(branch: string): Promise<{ ahead: number; behind: number }> {
+        const git = getSimpleGit();
+        try {
+            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
+            const [ahead, behind] = status.trim().split("\t").map(n => Number.parseInt(n, 10));
+            return { ahead, behind };
+        } catch {
+            return { ahead: 0, behind: 0 };
+        }
+    }
+
     // Identifiziere dynamisch die wichtigsten Target-Branches
     async identifyPotentialTargetBranches(
         allBranches: string[],
@@ -290,6 +302,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.text = "Detecting branch states...";
         const mergedBranches = new Map<string, MergeInfo>();
         const staleBranches = new Map<string, number>();
+        const behindOnlyBranches = new Map<string, { behindCount: number; lastCommitDate: number; }>();
 
         await Promise.all(
             candidateBranches.map(async (branch) => {
@@ -304,11 +317,17 @@ export default class BranchCleanupCommand extends BaseCommand {
                         mostRelevantBranch: mostRelevant,
                     });
                 } else {
-                    // Check for stale but up-to-date branches
-                    const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
-                    if (daysSinceCommit > 30) {
-                        const isSynced = await this.isUpToDateWithRemote(branch);
-                        if (isSynced) {
+                    const { ahead, behind } = await this.getRemoteStatus(branch);
+
+                    LOGGER.debug(this, `Branch ${branch} is ${ahead} commits ahead and ${behind} behind remote.`);
+
+                    if (behind > 0 && ahead === 0) {
+                        // Branch hat nur ausstehende Pulls
+                        behindOnlyBranches.set(branch, { behindCount: behind, lastCommitDate });
+                    } else if (ahead === 0 && behind === 0) {
+                        // Check for stale but up-to-date branches
+                        const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
+                        if (daysSinceCommit > 30) {
                             staleBranches.set(branch, lastCommitDate);
                         }
                     }
@@ -319,7 +338,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.stop();
         LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`);
 
-        if (mergedBranches.size === 0 && staleBranches.size === 0) {
+        if (mergedBranches.size === 0 && staleBranches.size === 0 && behindOnlyBranches.size === 0) {
             LOGGER.log(this, "✅ No cleanup candidates found. Repository is clean!");
             this.logTotalTime();
             return;
@@ -351,6 +370,22 @@ export default class BranchCleanupCommand extends BaseCommand {
                     value: branch,
                 };
             }));
+        }
+
+        if (behindOnlyBranches.size > 0) {
+            items.push({
+                label: `Branches mit ausstehenden Pulls (keine lokalen Änderungen)`,
+                type: "separator" as const,
+            });
+
+            const sortedBehind = [...behindOnlyBranches.entries()].sort((a, b) => b[1].lastCommitDate - a[1].lastCommitDate);
+
+            items.push(...sortedBehind.map(([branch, info]) => ({
+                key: branch,
+                label: `${chalk.blue(branch)} ${chalk.dim(`(Hinter Remote, zuletzt aktiv: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
+                type: "item" as const,
+                value: branch,
+            })));
         }
 
         if (staleBranches.size > 0) {
