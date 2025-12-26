@@ -94,8 +94,8 @@ export default [
                     },
                 },
             ],
-
             '@stylistic/object-curly-spacing': ['error', 'always'],
+
             '@stylistic/object-property-newline': 'error',
             '@stylistic/operator-linebreak': ['error', 'before'],
             '@stylistic/quote-props': ['error', 'as-needed'],
@@ -114,7 +114,7 @@ export default [
             'arrow-body-style': ['error', 'as-needed'],
             curly: ['error', 'all'],
             'no-await-in-loop': 'off',
-            'no-console': 'warn',
+            'no-console': 'off',
             'no-nested-ternary': 'error',
             'prefer-const': [
                 'error',
