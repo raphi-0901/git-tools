@@ -40,19 +40,23 @@ export default class BranchCleanupCommand extends BaseCommand {
 
         await Promise.all(
             branches.map(async (branch) => {
-                const raw = await git.raw([
-                    "log",
-                    branch,
-                    "-n",
-                    "1",
-                    "--pretty=format:%ci",
-                ]);
-                const date = new Date(raw.trim()).getTime();
-                this.branchToLastCommitDateCache.set(branch, date);
+                try {
+                    const raw = await git.raw([
+                        "log",
+                        branch,
+                        "-n",
+                        "1",
+                        "--pretty=format:%ci",
+                    ]);
+                    const date = new Date(raw.trim()).getTime();
+                    this.branchToLastCommitDateCache.set(branch, date);
 
-                // Berechne Wichtigkeit
-                const importance = this.calculateBranchImportance(branch, date);
-                this.branchImportanceScore.set(branch, importance);
+                    // Berechne Wichtigkeit
+                    const importance = this.calculateBranchImportance(branch, date);
+                    this.branchImportanceScore.set(branch, importance);
+                } catch (error) {
+                    LOGGER.debug(this, `Error getting commit date for ${branch}: ${error}`);
+                }
             })
         );
     }
@@ -61,13 +65,16 @@ export default class BranchCleanupCommand extends BaseCommand {
     calculateBranchImportance(branchName: string, lastCommitDate: number): number {
         let score = 0;
 
+        // Normalisiere Branch-Namen (entferne origin/ prefix)
+        const normalizedName = branchName.replace(/^origin\//, '');
+
         // Basis-Score für Branch-Namen (höher = wichtiger)
-        if (/^(main|master)$/.test(branchName)) score += 1000;
-        else if (/^(development|develop)$/.test(branchName)) score += 900;
-        else if (/^release\//.test(branchName)) score += 800;
-        else if (/^hotfix\//.test(branchName)) score += 700;
-        else if (branchName.startsWith('staging')) score += 600;
-        else if (branchName.startsWith('production')) score += 950;
+        if (/^(main|master)$/.test(normalizedName)) score += 1000;
+        else if (/^(development|develop)$/.test(normalizedName)) score += 900;
+        else if (/^release\//.test(normalizedName)) score += 800;
+        else if (/^hotfix\//.test(normalizedName)) score += 700;
+        else if (normalizedName.startsWith('staging')) score += 600;
+        else if (normalizedName.startsWith('production')) score += 950;
 
         // Aktivitäts-Score (neuere Branches sind wichtiger)
         const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
@@ -101,22 +108,42 @@ export default class BranchCleanupCommand extends BaseCommand {
     }
 
     // Identifiziere dynamisch die wichtigsten Target-Branches
-    async identifyPotentialTargetBranches(allBranches: string[]): Promise<string[]> {
+    async identifyPotentialTargetBranches(
+        allBranches: string[],
+        remoteBranches: string[]
+    ): Promise<string[]> {
         const git = getSimpleGit();
+
+        // Kombiniere lokale und remote branches für die Analyse
+        const allAvailableBranches = [
+            ...allBranches,
+            ...remoteBranches
+        ];
+
         const branchStats = new Map<string, { commitCount: number; lastCommitDate: number }>();
 
         // Sammle Statistiken für alle Branches
         await Promise.all(
-            allBranches.map(async (branch) => {
+            allAvailableBranches.map(async (branch) => {
                 try {
                     // Zähle Commits
                     const commitCountRaw = await git.raw(["rev-list", "--count", branch]);
                     const commitCount = Number.parseInt(commitCountRaw.trim(), 10);
 
-                    // Letzter Commit bereits im Cache
-                    const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
+                    // Hole letztes Commit Datum
+                    const dateRaw = await git.raw([
+                        "log",
+                        branch,
+                        "-n",
+                        "1",
+                        "--pretty=format:%ci",
+                    ]);
+                    const lastCommitDate = new Date(dateRaw.trim()).getTime();
 
                     branchStats.set(branch, { commitCount, lastCommitDate });
+
+                    // Speichere auch im Cache für spätere Verwendung
+                    this.branchToLastCommitDateCache.set(branch, lastCommitDate);
                 } catch (error) {
                     LOGGER.debug(this, `Error getting stats for ${branch}: ${error}`);
                 }
@@ -124,14 +151,17 @@ export default class BranchCleanupCommand extends BaseCommand {
         );
 
         // Score-Berechnung für jeden Branch
-        const branchScores = allBranches.map((branch) => {
+        const branchScores = allAvailableBranches.map((branch) => {
             const stats = branchStats.get(branch);
             if (!stats) return { branch, score: 0 };
 
             let score = 0;
 
+            // Normalisiere Branch-Namen (entferne origin/ prefix für Matching)
+            const normalizedBranch = branch.replace(/^origin\//, '');
+
             // 1. Geschützte Branches haben höchste Priorität
-            if (this.isProtectedBranch(branch)) {
+            if (this.isProtectedBranch(normalizedBranch)) {
                 score += 10_000;
             }
 
@@ -143,11 +173,11 @@ export default class BranchCleanupCommand extends BaseCommand {
             score += Math.max(0, 500 - daysSinceCommit);
 
             // 4. Name-basierte Heuristiken
-            if (/^(main|master|production|prod)$/i.test(branch)) score += 5000;
-            else if (/^(development|develop|dev)$/i.test(branch)) score += 4000;
-            else if (/^(staging|stage)$/i.test(branch)) score += 3000;
-            else if (/^(release|hotfix)\//i.test(branch)) score += 2000;
-            else if (/^(feature|feat)\//i.test(branch)) score -= 500; // Feature-Branches weniger wichtig
+            if (/^(main|master|production|prod)$/i.test(normalizedBranch)) score += 5000;
+            else if (/^(development|develop|dev)$/i.test(normalizedBranch)) score += 4000;
+            else if (/^(staging|stage)$/i.test(normalizedBranch)) score += 3000;
+            else if (/^(release|hotfix)\//i.test(normalizedBranch)) score += 2000;
+            else if (/^(feature|feat)\//i.test(normalizedBranch)) score -= 500; // Feature-Branches weniger wichtig
 
             return { branch, score };
         });
@@ -184,6 +214,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         try {
             // Git kann direkt prüfen ob ein Branch gemerged wurde
             // Wenn die Ausgabe leer ist, wurde der Branch NICHT gemerged
+            // Funktioniert auch mit remote branches (z.B. origin/main)
             const result = await git.raw([
                 "log",
                 `${targetBranch}..${sourceBranch}`,
@@ -192,7 +223,7 @@ export default class BranchCleanupCommand extends BaseCommand {
 
             return result.trim() === "";
         } catch (error) {
-            LOGGER.debug(this, `Error checking merge status: ${error}`);
+            LOGGER.debug(this, `Error checking merge status for ${sourceBranch} into ${targetBranch}: ${error}`);
             return false;
         }
     }
@@ -214,10 +245,18 @@ export default class BranchCleanupCommand extends BaseCommand {
 
         this.spinner.start();
         this.spinner.text = "Fetching repository...";
-        await git.fetch();
+        await git.fetch(['--all']); // Fetch von ALLEN remotes
 
         this.spinner.text = "Loading branches...";
         const allBranches = (await git.branchLocal()).all;
+
+        // Lade auch remote branches
+        const remoteBranchesRaw = (await git.branch(['-r'])).all;
+        const remoteBranches = remoteBranchesRaw
+            .filter(b => !b.includes('HEAD ->')) // Filter HEAD pointer
+            .map(b => b.trim());
+
+        LOGGER.debug(this, `Local branches: ${allBranches.length}, Remote branches: ${remoteBranches.length}`);
 
         const candidateBranches = allBranches.filter(
             (b) => !this.isProtectedBranch(b)
@@ -229,7 +268,10 @@ export default class BranchCleanupCommand extends BaseCommand {
         await this.buildLastCommitCache(allBranches);
 
         this.spinner.text = "Identifying important target branches...";
-        const potentialTargets = await this.identifyPotentialTargetBranches(allBranches);
+        const potentialTargets = await this.identifyPotentialTargetBranches(
+            allBranches,
+            remoteBranches
+        );
 
         this.spinner.text = "Detecting merged branches...";
         const mergedBranches = new Map<string, MergeInfo>();
@@ -305,7 +347,7 @@ export default class BranchCleanupCommand extends BaseCommand {
             this.spinner.text = `Deleting ${branchesToDelete.length} branches...`;
 
             for (const branch of branchesToDelete) {
-                // await git.deleteLocalBranch(branch);
+                await git.deleteLocalBranch(branch);
                 LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
             }
 
