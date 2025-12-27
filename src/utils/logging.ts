@@ -16,9 +16,18 @@ function withSpinner(ctx: BaseCommand, fn: () => void) {
 }
 
 /**
- * Info logs (normal operation).
+ * Normal logs.
  */
 export function log(ctx: BaseCommand, message: string): void {
+    withSpinner(ctx, () => {
+        ctx.log(message);
+    });
+}
+
+/**
+ * Info logs.
+ */
+export function info(ctx: BaseCommand, message: string): void {
     withSpinner(ctx, () => {
         ctx.log(`${chalk.cyan.bold("ℹ️  INFO:")} ${message}`);
     });

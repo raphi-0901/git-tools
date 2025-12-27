@@ -86,17 +86,13 @@ export default class BranchCleanupCommand extends BaseCommand {
 
             if (/^(main|master|production|prod)$/i.test(normalizedBranch)) {
                 score += 5000;
-            }
-            else if (/^(development|develop|dev)$/i.test(normalizedBranch)) {
+            } else if (/^(development|develop|dev)$/i.test(normalizedBranch)) {
                 score += 4000;
-            }
-            else if (/^(staging|stage)$/i.test(normalizedBranch)) {
+            } else if (/^(staging|stage)$/i.test(normalizedBranch)) {
                 score += 3000;
-            }
-            else if (/^(release|hotfix)\//i.test(normalizedBranch)) {
+            } else if (/^(release|hotfix)\//i.test(normalizedBranch)) {
                 score += 2000;
-            }
-            else if (/^(feature|feat)\//i.test(normalizedBranch)) {
+            } else if (/^(feature|feat)\//i.test(normalizedBranch)) {
                 score -= 500;
             }
 
@@ -150,12 +146,13 @@ export default class BranchCleanupCommand extends BaseCommand {
         const potentialTargets = await this.identifyPotentialTargetBranches(allBranches);
 
         this.spinner.text = "Detecting branch states...";
-        const analysis = await analyzeBranches(
-            candidateBranches,
-            potentialTargets,
-            flags.staleDays,
-            this.branchToLastCommitDateCache,
-            this.branchImportanceScore
+        const analysis = await analyzeBranches({
+                branches: candidateBranches,
+                importance: this.branchImportanceScore,
+                lastCommitCache: this.branchToLastCommitDateCache,
+                potentialTargets,
+                staleDays: flags.staleDays,
+            }
         );
 
         this.spinner.stop();
@@ -175,38 +172,22 @@ export default class BranchCleanupCommand extends BaseCommand {
         }
 
         const branchesToDelete = await promptBranchesToDelete(this, analysis, this.flags.yes)
-        console.log('branchesToDelete :>>', branchesToDelete);
+        if (branchesToDelete.length > 0) {
+            this.spinner.start();
+            for (const branch of branchesToDelete) {
+                try {
+                    // Uncomment to actually delete
+                    // await git.deleteLocalBranches(branchesToDelete, true)
+                    LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
+                } catch (error) {
+                    LOGGER.error(this, `Error deleting branch ${branch}: ${error}`);
+                }
+            }
 
+            this.spinner.stop();
+            LOGGER.log(this, `${chalk.green("✓")} Successfully deleted ${branchesToDelete.length} of ${localBranches.length} branches!`);
+        }
 
-
-        // TODO prompting each by each
-        // // 7️⃣ Build UI items for selection
-        // const items = buildBranchListItems(analysis);
-        //
-        // // 8️⃣ Prompt user for branches to delete
-        // const branchesToDelete = await withPromptExit(this, () =>
-        //     renderCheckboxList({ items, message: "Select branches to delete:" })
-        // );
-        //
-        // // 9️⃣ Delete selected branches
-        // if (branchesToDelete.length > 0) {
-        //     this.spinner.start();
-        //     for (const branch of branchesToDelete) {
-        //         const isDiverged = analysis.diverged.has(branch) || analysis.localOnly.has(branch);
-        //         try {
-        //             // Uncomment to actually delete
-        //             // await git.branch([isDiverged ? "-D" : "-d", branch]);
-        //             LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
-        //         } catch (error) {
-        //             LOGGER.error(this, `Error deleting branch ${branch}: ${error}`);
-        //         }
-        //     }
-        //
-        //     this.spinner.stop();
-        //     LOGGER.log(this, `${chalk.green("✓")} Successfully deleted ${branchesToDelete.length} branches!`);
-        // }
-
-        // 10️⃣ Finish timing
         this.logTotalTime();
     }
 

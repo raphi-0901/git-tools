@@ -38,9 +38,6 @@ export async function promptBranchesToDelete(
     analysis: BranchAnalysisResult,
     autoConfirm: boolean,
 ) {
-    console.log('analysis :>>', analysis);
-
-
     const { behindOnly, diverged, localOnly, merged, stale } = analysis;
 
     if (autoConfirm) {
