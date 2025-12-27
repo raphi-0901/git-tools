@@ -4,31 +4,43 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime.js";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
-import { ListItem, renderCheckboxList } from "../../ui/CheckboxList.js";
 import { analyzeBranches } from "../../utils/branchAnalyzer.js";
 import { isProtectedBranch } from "../../utils/branchProtection.js";
+import { promptBranchesToDelete } from "../../utils/branchSelection.js";
 import { calculateBranchImportance } from "../../utils/calculateBranchImportance.js";
+import { getCommitCount } from "../../utils/getCommitCount.js";
 import { getLastCommitDate } from "../../utils/getLastCommitDate.js";
-import { getRemoteStatus } from "../../utils/getRemoteStatus.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
-import { getUpstreamBranch } from "../../utils/getUpstreamBranch.js";
-import { isBranchMergedInto } from "../../utils/isBranchMergedInto.js";
 import * as LOGGER from "../../utils/logging.js";
-import { withPromptExit } from "../../utils/withPromptExist.js";
 
 dayjs.extend(relativeTime);
 
 export default class BranchCleanupCommand extends BaseCommand {
+    static flags = {
+        'staleDays': Flags.integer({
+            aliases: ['stale-days'],
+            char: 'd',
+            default: 30,
+            description: 'Number of days since last commit after which a branch is considered stale',
+            min: 1,
+            required: false,
+        }),
+    };
     public readonly configId = "branch-cleanup";
     private branchImportanceScore = new Map<string, number>();
+    private branchToCommitCountCache = new Map<string, number>();
     private branchToLastCommitDateCache = new Map<string, number>();
 
-    async buildLastCommitCache(branches: string[]) {
+    async buildCache(branches: string[]) {
         await Promise.all(
             branches.map(async (branch) => {
                 try {
-                    const lastCommitDate = await getLastCommitDate(branch)
+                    const [lastCommitDate, commitCount] = await Promise.all([
+                        getLastCommitDate(branch),
+                        getCommitCount(branch),
+                    ])
                     this.branchToLastCommitDateCache.set(branch, lastCommitDate);
+                    this.branchToCommitCountCache.set(branch, commitCount);
 
                     const importance = calculateBranchImportance(branch, lastCommitDate);
                     this.branchImportanceScore.set(branch, importance);
@@ -47,49 +59,59 @@ export default class BranchCleanupCommand extends BaseCommand {
     async identifyPotentialTargetBranches(
         allBranches: string[]
     ): Promise<string[]> {
-        const git = getSimpleGit();
         const branchStats = new Map<string, { commitCount: number; lastCommitDate: number }>();
+        for (const branch of allBranches) {
+            const commitCount = this.branchToCommitCountCache.get(branch) ?? 0;
+            const lastCommitDate = this.branchToLastCommitDateCache.get(branch) ?? 0;
 
-        await Promise.all(
-            allBranches.map(async (branch) => {
-                try {
-                    const commitCount = Number.parseInt(await git.raw(["rev-list", "--count", branch]), 10);
-                    const dateRaw = await git.raw(["log", branch, "-n", "1", "--pretty=format:%ci"]);
-                    const lastCommitDate = new Date(dateRaw.trim()).getTime();
-
-                    branchStats.set(branch, { commitCount, lastCommitDate });
-                    this.branchToLastCommitDateCache.set(branch, lastCommitDate);
-                } catch (error) {
-                    LOGGER.debug(this, `Error getting stats for ${branch}: ${error}`);
-                }
-            })
-        );
+            branchStats.set(branch, { commitCount, lastCommitDate });
+        }
 
         const branchScores = allBranches.map((branch) => {
             const stats = branchStats.get(branch);
-            if (!stats) return { branch, score: 0 };
+            if (!stats) {
+                return { branch, score: 0 };
+            }
+
             let score = 0;
             const normalizedBranch = branch.replace(/^origin\//, '');
 
-            if (isProtectedBranch(normalizedBranch)) score += 10_000;
+            if (isProtectedBranch(normalizedBranch)) {
+                score += 10_000;
+            }
+
             score += Math.log(stats.commitCount + 1) * 100;
-            const daysSinceCommit = (Date.now() - stats.lastCommitDate) / (1000 * 60 * 60 * 24);
+            const daysSinceCommit = dayjs(stats.lastCommitDate).diff(dayjs(), "days", true);
             score += Math.max(0, 500 - daysSinceCommit);
 
-            if (/^(main|master|production|prod)$/i.test(normalizedBranch)) score += 5000;
-            else if (/^(development|develop|dev)$/i.test(normalizedBranch)) score += 4000;
-            else if (/^(staging|stage)$/i.test(normalizedBranch)) score += 3000;
-            else if (/^(release|hotfix)\//i.test(normalizedBranch)) score += 2000;
-            else if (/^(feature|feat)\//i.test(normalizedBranch)) score -= 500;
+            if (/^(main|master|production|prod)$/i.test(normalizedBranch)) {
+                score += 5000;
+            }
+            else if (/^(development|develop|dev)$/i.test(normalizedBranch)) {
+                score += 4000;
+            }
+            else if (/^(staging|stage)$/i.test(normalizedBranch)) {
+                score += 3000;
+            }
+            else if (/^(release|hotfix)\//i.test(normalizedBranch)) {
+                score += 2000;
+            }
+            else if (/^(feature|feat)\//i.test(normalizedBranch)) {
+                score -= 500;
+            }
 
             return { branch, score };
         });
 
-        const sortedBranches = branchScores.sort((a, b) => b.score - a.score).map((b) => b.branch);
-        const threshold = 1000;
-        const topBranches = sortedBranches.filter((branch) => (branchScores.find((b) => b.branch === branch)?.score ?? 0) > threshold);
+        return branchScores
+            .sort((a, b) => b.score - a.score)
+            .filter(({ score }, index) => {
+                if (index > 15) {
+                    return false
+                }
 
-        return topBranches.slice(0, Math.max(5, Math.min(15, topBranches.length)));
+                return score > 1000
+            }).map(({ branch }) => branch);
     }
 
     logTotalTime() {
@@ -97,7 +119,7 @@ export default class BranchCleanupCommand extends BaseCommand {
     }
 
     async run() {
-        await this.parse(BranchCleanupCommand);
+        const { flags } = await this.parse(BranchCleanupCommand);
         this.timer.start("total");
         this.spinner.start();
 
@@ -116,11 +138,13 @@ export default class BranchCleanupCommand extends BaseCommand {
         const localBranches = (await git.branchLocal()).all;
         const remoteBranches = (await git.branch(["-r"])).all;
         const allBranches = [...localBranches, ...remoteBranches];
+
+        // all locale branches which are not protected
         const candidateBranches = localBranches.filter(b => !isProtectedBranch(b));
 
         // Build cache for last commit dates and importance
         this.spinner.text = "Analyzing branch activity...";
-        await this.buildLastCommitCache(allBranches);
+        await this.buildCache(allBranches);
 
         // Identify potential target branches
         const potentialTargets = await this.identifyPotentialTargetBranches(allBranches);
@@ -129,6 +153,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         const analysis = await analyzeBranches(
             candidateBranches,
             potentialTargets,
+            flags.staleDays,
             this.branchToLastCommitDateCache,
             this.branchImportanceScore
         );
@@ -145,8 +170,14 @@ export default class BranchCleanupCommand extends BaseCommand {
         ) {
             LOGGER.log(this, "✅ No cleanup candidates found.");
             this.logTotalTime();
+
             return;
         }
+
+        const branchesToDelete = await promptBranchesToDelete(this, analysis, this.flags.yes)
+        console.log('branchesToDelete :>>', branchesToDelete);
+
+
 
         // TODO prompting each by each
         // // 7️⃣ Build UI items for selection

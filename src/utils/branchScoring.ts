@@ -35,14 +35,3 @@ export function scoreBranch(
 
     return score;
 }
-
-export function selectMostRelevantBranch(
-    branches: string[],
-    scoreMap: Map<string, number>
-): string {
-    return branches.reduce((best, current) =>
-        (scoreMap.get(current) ?? 0) > (scoreMap.get(best) ?? 0)
-            ? current
-            : best
-    );
-}
