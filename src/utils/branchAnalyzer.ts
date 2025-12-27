@@ -1,35 +1,50 @@
-import dayjs from "dayjs";
-
 import { BranchAnalysisResult } from "../types/BranchAnalysisResult.js";
 import { calculateAbsoluteDayDifference } from "./calculateAbsoluteDayDifference.js";
 import { getRemoteStatus } from "./getRemoteStatus.js";
 import { findMergeTargets } from "./mergeDetection.js";
 
+interface AnalyzeBranchesOptions {
+    /** List of branch names to analyze */
+    branches: string[];
+    /** Map of branch name → numeric importance score for merge relevance */
+    importance: Map<string, number>;
+    /** Map of branch name → last commit timestamp in milliseconds */
+    lastCommitCache: Map<string, number>;
+    /** Branches to consider as potential merge targets */
+    potentialTargets: string[];
+    /** Number of days after which a branch is considered stale */
+    staleDays: number;
+}
+
 /**
- * Analyzes a list of branches to categorize them based on merge status,
- * remote synchronization, and staleness.
+ * Analyzes a list of branches and categorizes them according to:
  *
- * Categories include:
- * - `merged`: Branches already merged into one or more potential target branches.
- * - `diverged`: Branches ahead and behind the remote with last commit older than `staleDays` days.
- * - `behindOnly`: Branches behind the remote with no local commits ahead.
- * - `localOnly`: Branches with no remote counterpart.
- * - `stale`: Branches fully up-to-date with remote but with last commit older than `staleDays` days.
+ * 1. **Merged**: Branches already merged into one or more target branches.
+ * 2. **Diverged**: Branches ahead and behind the remote with last commit older than `staleDays`.
+ * 3. **Behind Only**: Branches behind the remote with no local commits ahead.
+ * 4. **Local Only**: Branches with no remote counterpart and older than `staleDays`.
+ * 5. **Stale**: Branches fully up-to-date with remote but with last commit older than `staleDays`.
  *
- * @param branches - List of branch names to analyze
- * @param potentialTargets - Branches to consider for merge detection
- * @param staleDays - Number of days after which branches are considered stale
- * @param lastCommitCache - Map of branch name → last commit timestamp (ms)
- * @param importance - Map of branch name → importance score for selecting the most relevant merge target
- * @returns A promise resolving to a `BranchAnalysisResult` categorizing all input branches
+ * The function uses last commit dates, remote tracking status, and merge target analysis
+ * to determine the correct categorization for each branch.
+ *
+ * @param options - Object containing all options for branch analysis
+ * @param options.branches - List of branch names to analyze
+ * @param options.potentialTargets - Branches to consider for merge detection
+ * @param options.staleDays - Number of days after which branches are considered stale
+ * @param options.lastCommitCache - Map of branch name → last commit timestamp (ms)
+ * @param options.importance - Map of branch name → importance score used for selecting
+ *                             the most relevant merge target
+ * @returns Promise that resolves to a `BranchAnalysisResult`, a categorization map containing:
+ *          - `merged`: Map of branch → { lastCommitDate, mergedIntoBranches, mostRelevantBranch }
+ *          - `diverged`: Map of branch → { ahead, behind, lastCommitDate }
+ *          - `behindOnly`: Map of branch → { behind, lastCommitDate }
+ *          - `localOnly`: Map of branch → lastCommitDate
+ *          - `stale`: Map of branch → lastCommitDate
  */
-export async function analyzeBranches(
-    branches: string[],
-    potentialTargets: string[],
-    staleDays: number,
-    lastCommitCache: Map<string, number>,
-    importance: Map<string, number>
-): Promise<BranchAnalysisResult> {
+export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<BranchAnalysisResult> {
+    const { branches, importance, lastCommitCache, potentialTargets, staleDays } = options;
+
     const result: BranchAnalysisResult = {
         behindOnly: new Map(),
         diverged: new Map(),
@@ -52,8 +67,8 @@ export async function analyzeBranches(
         }
 
         const { ahead, behind, hasRemote } = await getRemoteStatus(branch);
-        const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, Date.now())
-        
+        const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, Date.now());
+
         if (!hasRemote && daysSinceLastCommit > staleDays) {
             result.localOnly.set(branch, lastCommitDate);
             return;
@@ -66,7 +81,7 @@ export async function analyzeBranches(
 
         if (behind > 0 && ahead === 0) {
             result.behindOnly.set(branch, { behind, lastCommitDate });
-            return
+            return;
         }
 
         if (ahead === 0 && behind === 0 && daysSinceLastCommit > staleDays) {
@@ -80,9 +95,11 @@ export async function analyzeBranches(
 /**
  * Selects the most relevant branch from a list based on a scoring map.
  *
+ * If multiple branches have the same score, the first encountered branch is returned.
+ *
  * @param branches - List of branch names to choose from
- * @param scoreMap - Map of branch name → numeric score indicating importance
- * @returns The branch with the highest score; if multiple branches have the same score, the first is returned
+ * @param scoreMap - Map of branch name → numeric importance score
+ * @returns Branch with the highest score from the input list
  */
 function selectMostRelevantBranch(
     branches: string[],
