@@ -1,4 +1,5 @@
 export type MergeInfo = {
     lastCommitDate: number;
-    mergedInto: string;
+    mergedIntoBranches: string[];
+    mostRelevantBranch: string;
 };

@@ -2,8 +2,7 @@ import { getUpstreamBranch } from "../utils/getUpstreamBranch.js";
 import { isBranchMergedInto } from "../utils/isBranchMergedInto.js";
 
 /**
- * Finds the first branch from a list of potential targets into which
- * the source branch has already been merged.
+ * Finds which branches a source branch has already been merged into.
  *
  * The function skips:
  * - The source branch itself
@@ -11,28 +10,28 @@ import { isBranchMergedInto } from "../utils/isBranchMergedInto.js";
  *
  * @param sourceBranch - The branch to check for merges from
  * @param potentialTargets - List of branches to consider as potential merge targets
- * @returns The first branch name into which the source branch has been merged,
- *          or `null` if none of the targets contain the merge
+ * @returns A promise resolving to an array of branch names into which the source branch has been merged
  */
 export async function findMergeTargets(
     sourceBranch: string,
-    branchUpstream: null | string,
     potentialTargets: string[]
-) {
+): Promise<string[]> {
+    const mergedInto: string[] = [];
+    const upstream = await getUpstreamBranch(sourceBranch);
 
     for (const target of potentialTargets) {
         if (target === sourceBranch) {
             continue;
         }
 
-        if (branchUpstream && target === branchUpstream) {
+        if (upstream && target === upstream) {
             continue;
         }
 
         if (await isBranchMergedInto(sourceBranch, target)) {
-            return target;
+            mergedInto.push(target);
         }
     }
 
-    return null;
+    return mergedInto;
 }

@@ -148,6 +148,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         this.spinner.text = "Detecting branch states...";
         const analysis = await analyzeBranches({
                 branches: candidateBranches,
+                importance: this.branchImportanceScore,
                 lastCommitCache: this.branchToLastCommitDateCache,
                 potentialTargets,
                 staleDays: flags.staleDays,
