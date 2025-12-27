@@ -1,41 +1,49 @@
 import { getSimpleGit } from "./getSimpleGit.js";
 
 export type RemoteStatus = {
-    ahead: number
-    behind: number
-    hasRemote: boolean
-}
+    ahead: number;
+    behind: number;
+    hasRemote: boolean;
+    remoteBranch: null | string;
+};
 
 /**
  * Determines the synchronization status of a local Git branch
- * relative to its corresponding `origin/<branch>` remote branch.
+ * relative to its corresponding remote branch.
  *
- * If the remote branch exists, the function reports how many commits
- * the local branch is ahead of or behind the remote. If the remote
- * branch does not exist, `hasRemote` is set to `false` and both
- * counters are `0`.
+ * Returns the number of commits the local branch is ahead/behind,
+ * whether a remote exists, and the remote branch name.
  *
- * @param branch - The name of the local branch to check (e.g. `"main"`)
+ * @param branch - The name of the local branch to check (e.g., `"main"`)
  * @returns A promise resolving to the remote synchronization status
  */
 export async function getRemoteStatus(branch: string): Promise<RemoteStatus> {
     const git = getSimpleGit();
+    const remoteBranch = `origin/${branch}`;
+
     try {
-        await git.raw(["rev-parse", "--verify", `origin/${branch}`]);
+        // This will fail if the remote branch does not exist
         const status = await git.raw([
             "rev-list",
             "--left-right",
             "--count",
-            `${branch}...origin/${branch}`
+            `${branch}...${remoteBranch}`
         ]);
 
-        const [ahead, behind] = status
-            .trim()
-            .split("\t")
-            .map(n => Number.parseInt(n, 10));
+        const [ahead, behind] = status.trim().split("\t").map(Number);
 
-        return { ahead, behind, hasRemote: true };
+        return {
+            ahead,
+            behind,
+            hasRemote: true,
+            remoteBranch
+        };
     } catch {
-        return { ahead: 0, behind: 0, hasRemote: false };
+        return {
+            ahead: 0,
+            behind: 0,
+            hasRemote: false,
+            remoteBranch: null
+        };
     }
 }

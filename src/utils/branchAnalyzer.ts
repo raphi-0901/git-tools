@@ -1,13 +1,11 @@
 import { BranchAnalysisResult } from "../types/BranchAnalysisResult.js";
 import { calculateAbsoluteDayDifference } from "./calculateAbsoluteDayDifference.js";
 import { getRemoteStatus } from "./getRemoteStatus.js";
-import { findMergeTargets } from "./mergeDetection.js";
+import { isBranchMergedInto } from "./isBranchMergedInto.js";
 
 interface AnalyzeBranchesOptions {
     /** List of branch names to analyze */
     branches: string[];
-    /** Map of branch name → numeric importance score for merge relevance */
-    importance: Map<string, number>;
     /** Map of branch name → last commit timestamp in milliseconds */
     lastCommitCache: Map<string, number>;
     /** Branches to consider as potential merge targets */
@@ -33,8 +31,7 @@ interface AnalyzeBranchesOptions {
  * @param options.potentialTargets - Branches to consider for merge detection
  * @param options.staleDays - Number of days after which branches are considered stale
  * @param options.lastCommitCache - Map of branch name → last commit timestamp (ms)
- * @param options.importance - Map of branch name → importance score used for selecting
- *                             the most relevant merge target
+ *
  * @returns Promise that resolves to a `BranchAnalysisResult`, a categorization map containing:
  *          - `merged`: Map of branch → { lastCommitDate, mergedIntoBranches, mostRelevantBranch }
  *          - `diverged`: Map of branch → { ahead, behind, lastCommitDate }
@@ -43,7 +40,8 @@ interface AnalyzeBranchesOptions {
  *          - `stale`: Map of branch → lastCommitDate
  */
 export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<BranchAnalysisResult> {
-    const { branches, importance, lastCommitCache, potentialTargets, staleDays } = options;
+    const { branches, lastCommitCache, potentialTargets, staleDays } = options;
+    const now = Date.now();
 
     const result: BranchAnalysisResult = {
         behindOnly: new Map(),
@@ -54,20 +52,33 @@ export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<
     };
 
     await Promise.all(branches.map(async (branch) => {
-        const mergedInto = await findMergeTargets(branch, potentialTargets);
         const lastCommitDate = lastCommitCache.get(branch) ?? 0;
+        const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, now);
+
+        let mergedInto: string = "";
+        const { ahead, behind, hasRemote, remoteBranch } = await getRemoteStatus(branch);
+        for (const target of potentialTargets) {
+            if (target === remoteBranch) {
+                continue;
+            }
+
+            if (remoteBranch && target === remoteBranch) {
+                continue;
+            }
+
+            if (await isBranchMergedInto(branch, target)) {
+                mergedInto = target;
+                break;
+            }
+        }
 
         if (mergedInto.length > 0) {
             result.merged.set(branch, {
                 lastCommitDate,
-                mergedIntoBranches: mergedInto,
-                mostRelevantBranch: selectMostRelevantBranch(mergedInto, importance)
+                mergedInto,
             });
             return;
         }
-
-        const { ahead, behind, hasRemote } = await getRemoteStatus(branch);
-        const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, Date.now());
 
         if (!hasRemote && daysSinceLastCommit > staleDays) {
             result.localOnly.set(branch, lastCommitDate);
@@ -90,24 +101,4 @@ export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<
     }));
 
     return result;
-}
-
-/**
- * Selects the most relevant branch from a list based on a scoring map.
- *
- * If multiple branches have the same score, the first encountered branch is returned.
- *
- * @param branches - List of branch names to choose from
- * @param scoreMap - Map of branch name → numeric importance score
- * @returns Branch with the highest score from the input list
- */
-function selectMostRelevantBranch(
-    branches: string[],
-    scoreMap: Map<string, number>
-): string {
-    return branches.reduce((best, current) =>
-        (scoreMap.get(current) ?? 0) > (scoreMap.get(best) ?? 0)
-            ? current
-            : best
-    );
 }

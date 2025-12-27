@@ -54,7 +54,7 @@ export async function promptBranchesToDelete(
         {
             branches: merged,
             formatLabel: (branch, info) =>
-                `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(info.mostRelevantBranch)} ${chalk.dim(`(${dayjs(info.lastCommitDate).fromNow()})`)}`,
+                `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(info.mergedInto)} ${chalk.dim(`(${dayjs(info.lastCommitDate).fromNow()})`)}`,
             label: `Merged Branches (${merged.size})`,
             message: "Merged branches to delete:",
             type: "merged",
