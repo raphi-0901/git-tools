@@ -5,7 +5,13 @@ import relativeTime from "dayjs/plugin/relativeTime.js";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import { ListItem, renderCheckboxList } from "../../ui/CheckboxList.js";
+import { isProtectedBranch } from "../../utils/branchProtection.js";
+import { calculateBranchImportance } from "../../utils/calculateBranchImportance.js";
+import { getLastCommitDate } from "../../utils/getLastCommitDate.js";
+import { getRemoteStatus } from "../../utils/getRemoteStatus.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
+import { getUpstreamBranch } from "../../utils/getUpstreamBranch.js";
+import { isBranchMergedInto } from "../../utils/isBranchMergedInto.js";
 import * as LOGGER from "../../utils/logging.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
 
@@ -26,55 +32,21 @@ export default class BranchCleanupCommand extends BaseCommand {
     public readonly configId = "branch-cleanup";
     private branchImportanceScore = new Map<string, number>();
     private branchToLastCommitDateCache = new Map<string, number>();
-    private readonly protectedBranchPatterns = [
-        /^main$/,
-        /^master$/,
-        /^development$/,
-        /^develop$/,
-        /^release\//,
-        /^hotfix\//,
-    ];
 
     async buildLastCommitCache(branches: string[]) {
-        const git = getSimpleGit();
-
         await Promise.all(
             branches.map(async (branch) => {
                 try {
-                    const raw = await git.raw([
-                        "log",
-                        branch,
-                        "-n",
-                        "1",
-                        "--pretty=format:%ci",
-                    ]);
-                    const date = new Date(raw.trim()).getTime();
-                    this.branchToLastCommitDateCache.set(branch, date);
+                    const lastCommitDate = await getLastCommitDate(branch)
+                    this.branchToLastCommitDateCache.set(branch, lastCommitDate);
 
-                    const importance = this.calculateBranchImportance(branch, date);
+                    const importance = calculateBranchImportance(branch, lastCommitDate);
                     this.branchImportanceScore.set(branch, importance);
                 } catch (error) {
                     LOGGER.debug(this, `Error getting commit date for ${branch}: ${error}`);
                 }
             })
         );
-    }
-
-    calculateBranchImportance(branchName: string, lastCommitDate: number): number {
-        let score = 0;
-        const normalizedName = branchName.replace(/^origin\//, '');
-
-        if (/^(main|master)$/.test(normalizedName)) score += 1000;
-        else if (/^(development|develop)$/.test(normalizedName)) score += 900;
-        else if (/^release\//.test(normalizedName)) score += 800;
-        else if (/^hotfix\//.test(normalizedName)) score += 700;
-        else if (normalizedName.startsWith('staging')) score += 600;
-        else if (normalizedName.startsWith('production')) score += 950;
-
-        const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
-        const activityScore = Math.max(0, 100 - daysSinceCommit);
-
-        return score + activityScore;
     }
 
     async catch(error: unknown) {
@@ -87,11 +59,20 @@ export default class BranchCleanupCommand extends BaseCommand {
         potentialTargets: string[]
     ): Promise<string[]> {
         const mergedInto: string[] = [];
+        const upstream = await getUpstreamBranch(sourceBranch);
 
         for (const target of potentialTargets) {
-            if (target === sourceBranch) continue;
+            // same branch -> skip
+            if (target === sourceBranch) {
+                continue;
+            }
 
-            const isMerged = await this.isBranchMergedInto(sourceBranch, target);
+            // same upstream -> skip
+            if (upstream && target === upstream) {
+                continue;
+            }
+
+            const isMerged = await isBranchMergedInto(sourceBranch, target);
             if (isMerged) {
                 mergedInto.push(target);
             }
@@ -100,28 +81,14 @@ export default class BranchCleanupCommand extends BaseCommand {
         return mergedInto;
     }
 
-    async getRemoteStatus(branch: string): Promise<{ ahead: number; behind: number; hasRemote: boolean }> {
-        const git = getSimpleGit();
-        try {
-            await git.raw(["rev-parse", "--verify", `origin/${branch}`]);
-            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
-            const [ahead, behind] = status.trim().split("\t").map(n => Number.parseInt(n, 10));
-            return { ahead, behind, hasRemote: true };
-        } catch {
-            return { ahead: 0, behind: 0, hasRemote: false };
-        }
-    }
-
     async identifyPotentialTargetBranches(
-        allBranches: string[],
-        remoteBranches: string[]
+        allBranches: string[]
     ): Promise<string[]> {
         const git = getSimpleGit();
-        const allAvailableBranches = [...allBranches, ...remoteBranches];
         const branchStats = new Map<string, { commitCount: number; lastCommitDate: number }>();
 
         await Promise.all(
-            allAvailableBranches.map(async (branch) => {
+            allBranches.map(async (branch) => {
                 try {
                     const commitCountRaw = await git.raw(["rev-list", "--count", branch]);
                     const commitCount = Number.parseInt(commitCountRaw.trim(), 10);
@@ -136,13 +103,13 @@ export default class BranchCleanupCommand extends BaseCommand {
             })
         );
 
-        const branchScores = allAvailableBranches.map((branch) => {
+        const branchScores = allBranches.map((branch) => {
             const stats = branchStats.get(branch);
             if (!stats) return { branch, score: 0 };
             let score = 0;
             const normalizedBranch = branch.replace(/^origin\//, '');
 
-            if (this.isProtectedBranch(normalizedBranch)) score += 10_000;
+            if (isProtectedBranch(normalizedBranch)) score += 10_000;
             score += Math.log(stats.commitCount + 1) * 100;
             const daysSinceCommit = (Date.now() - stats.lastCommitDate) / (1000 * 60 * 60 * 24);
             score += Math.max(0, 500 - daysSinceCommit);
@@ -160,32 +127,7 @@ export default class BranchCleanupCommand extends BaseCommand {
         const threshold = 1000;
         const topBranches = sortedBranches.filter((branch) => (branchScores.find((b) => b.branch === branch)?.score ?? 0) > threshold);
 
-        const targets = topBranches.slice(0, Math.max(5, Math.min(15, topBranches.length)));
-        return targets;
-    }
-
-    async isBranchMergedInto(sourceBranch: string, targetBranch: string): Promise<boolean> {
-        const git = getSimpleGit();
-        try {
-            const result = await git.raw(["log", `${targetBranch}..${sourceBranch}`, "--oneline"]);
-            return result.trim() === "";
-        } catch {
-            return false;
-        }
-    }
-
-    isProtectedBranch(branch: string): boolean {
-        return this.protectedBranchPatterns.some((r) => r.test(branch));
-    }
-
-    async isUpToDateWithRemote(branch: string): Promise<boolean> {
-        const git = getSimpleGit();
-        try {
-            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
-            return status.trim() === "0\t0";
-        } catch {
-            return false;
-        }
+        return topBranches.slice(0, Math.max(5, Math.min(15, topBranches.length)));
     }
 
     logTotalTime() {
@@ -203,15 +145,17 @@ export default class BranchCleanupCommand extends BaseCommand {
         try { await git.fetch(['--all']); } catch{ LOGGER.warn(this, `Error fetching repository.`); }
 
         this.spinner.text = "Loading branches...";
-        const allBranches = (await git.branchLocal()).all;
-        const remoteBranchesRaw = (await git.branch(['-r'])).all;
-        const remoteBranches = remoteBranchesRaw.filter(b => !b.includes('HEAD ->')).map(b => b.trim());
+        const localBranches = (await git.branchLocal()).all;
+        const remoteBranches = (await git.branch(['-r'])).all;
+        console.log('remotBranchesRaw :>>', remoteBranches);
 
-        const candidateBranches = allBranches.filter((b) => !this.isProtectedBranch(b));
+        // potential branches to delete are all local branches that are not protected
+        const candidateBranches = localBranches.filter((b) => !isProtectedBranch(b));
+        const allBranches = [...localBranches, ...remoteBranches];
         this.spinner.text = "Analyzing branch activity...";
         await this.buildLastCommitCache(allBranches);
 
-        const potentialTargets = await this.identifyPotentialTargetBranches(allBranches, remoteBranches);
+        const potentialTargets = await this.identifyPotentialTargetBranches(allBranches);
 
         this.spinner.text = "Detecting branch states...";
         const mergedBranches = new Map<string, MergeInfo>();
@@ -229,7 +173,7 @@ export default class BranchCleanupCommand extends BaseCommand {
                     const mostRelevant = this.selectMostRelevantBranch(mergedInto);
                     mergedBranches.set(branch, { lastCommitDate, mergedIntoBranches: mergedInto, mostRelevantBranch: mostRelevant });
                 } else {
-                    const { ahead, behind, hasRemote } = await this.getRemoteStatus(branch);
+                    const { ahead, behind, hasRemote } = await getRemoteStatus(branch);
                     const daysSinceCommit = (Date.now() - lastCommitDate) / (1000 * 60 * 60 * 24);
 
                     if (!hasRemote) {
@@ -306,7 +250,7 @@ export default class BranchCleanupCommand extends BaseCommand {
                 // For diverged branches we use -D instead of -d to force delete despite missing merge
                 const isDiverged = divergedBranches.has(branch) || localOnlyBranches.has(branch);
                 try {
-                    await git.branch([isDiverged ? "-D" : "-d", branch]);
+                    // await git.branch([isDiverged ? "-D" : "-d", branch]);
                     LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
                 }
                 catch (error) {
