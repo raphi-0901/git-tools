@@ -14,6 +14,7 @@ export default [includeIgnoreFile(gitignorePath),
             "no-await-in-loop": "off",
             "object-curly-spacing": ["error", "always"],
             'unicorn/filename-case': 'off',
+            'unicorn/no-array-reduce': 'off',
         },
     }
 ]
