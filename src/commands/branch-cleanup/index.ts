@@ -19,10 +19,11 @@ type MergeInfo = {
 
 export default class BranchCleanupCommand extends BaseCommand {
     static flags = {
-        debug: Flags.boolean({ description: "Show debug logs." }),
-        yes: Flags.boolean({ char: "y", description: "Automatically delete all candidate branches without prompt." }),
+        debug: Flags.boolean({
+            description: "Show debug logs.",
+        }),
     };
-public readonly configId = "branch-cleanup";
+    public readonly configId = "branch-cleanup";
     private branchImportanceScore = new Map<string, number>();
     private branchToLastCommitDateCache = new Map<string, number>();
     private readonly protectedBranchPatterns = [
@@ -40,7 +41,13 @@ public readonly configId = "branch-cleanup";
         await Promise.all(
             branches.map(async (branch) => {
                 try {
-                    const raw = await git.raw(["log", branch, "-n", "1", "--pretty=format:%ci"]);
+                    const raw = await git.raw([
+                        "log",
+                        branch,
+                        "-n",
+                        "1",
+                        "--pretty=format:%ci",
+                    ]);
                     const date = new Date(raw.trim()).getTime();
                     this.branchToLastCommitDateCache.set(branch, date);
 
@@ -75,7 +82,10 @@ public readonly configId = "branch-cleanup";
         this.log(chalk.red("🚫 Branch cleanup cancelled."));
     }
 
-    async findMergeTargets(sourceBranch: string, potentialTargets: string[]): Promise<string[]> {
+    async findMergeTargets(
+        sourceBranch: string,
+        potentialTargets: string[]
+    ): Promise<string[]> {
         const mergedInto: string[] = [];
 
         for (const target of potentialTargets) {
@@ -90,7 +100,22 @@ public readonly configId = "branch-cleanup";
         return mergedInto;
     }
 
-    async identifyPotentialTargetBranches(allBranches: string[], remoteBranches: string[]): Promise<string[]> {
+    async getRemoteStatus(branch: string): Promise<{ ahead: number; behind: number; hasRemote: boolean }> {
+        const git = getSimpleGit();
+        try {
+            await git.raw(["rev-parse", "--verify", `origin/${branch}`]);
+            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
+            const [ahead, behind] = status.trim().split("\t").map(n => Number.parseInt(n, 10));
+            return { ahead, behind, hasRemote: true };
+        } catch {
+            return { ahead: 0, behind: 0, hasRemote: false };
+        }
+    }
+
+    async identifyPotentialTargetBranches(
+        allBranches: string[],
+        remoteBranches: string[]
+    ): Promise<string[]> {
         const git = getSimpleGit();
         const allAvailableBranches = [...allBranches, ...remoteBranches];
         const branchStats = new Map<string, { commitCount: number; lastCommitDate: number }>();
@@ -135,7 +160,8 @@ public readonly configId = "branch-cleanup";
         const threshold = 1000;
         const topBranches = sortedBranches.filter((branch) => (branchScores.find((b) => b.branch === branch)?.score ?? 0) > threshold);
 
-        return topBranches.slice(0, Math.max(5, Math.min(15, topBranches.length)));
+        const targets = topBranches.slice(0, Math.max(5, Math.min(15, topBranches.length)));
+        return targets;
     }
 
     async isBranchMergedInto(sourceBranch: string, targetBranch: string): Promise<boolean> {
@@ -152,14 +178,31 @@ public readonly configId = "branch-cleanup";
         return this.protectedBranchPatterns.some((r) => r.test(branch));
     }
 
+    async isUpToDateWithRemote(branch: string): Promise<boolean> {
+        const git = getSimpleGit();
+        try {
+            const status = await git.raw(["rev-list", "--left-right", "--count", `${branch}...origin/${branch}`]);
+            return status.trim() === "0\t0";
+        } catch {
+            return false;
+        }
+    }
+
     logTotalTime() {
         LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`);
     }
 
-    async getBranchCandidatesPerType() {
-        this.spinner.text = "Loading branches...";
-        const git = getSimpleGit();
+    async run() {
+        await this.parse(BranchCleanupCommand);
+        this.timer.start("total");
+        this.timer.start("response");
 
+        const git = getSimpleGit();
+        this.spinner.start();
+        this.spinner.text = "Fetching repository...";
+        try { await git.fetch(['--all']); } catch{ LOGGER.warn(this, `Error fetching repository.`); }
+
+        this.spinner.text = "Loading branches...";
         const allBranches = (await git.branchLocal()).all;
         const remoteBranchesRaw = (await git.branch(['-r'])).all;
         const remoteBranches = remoteBranchesRaw.filter(b => !b.includes('HEAD ->')).map(b => b.trim());
@@ -192,6 +235,7 @@ public readonly configId = "branch-cleanup";
                     if (!hasRemote) {
                         localOnlyBranches.set(branch, lastCommitDate);
                     } else if (ahead > 0 && behind > 0) {
+                        // Diverged: Has local changes but behind remote
                         if (daysSinceCommit > 30) {
                             divergedBranches.set(branch, { ahead, behind, lastCommitDate });
                         }
@@ -205,160 +249,80 @@ public readonly configId = "branch-cleanup";
         );
 
         this.spinner.stop();
-
-        return {
-            mergedBranches,
-            staleBranches,
-            behindOnlyBranches,
-            localOnlyBranches,
-            divergedBranches,
-        }
-    }
-
-    async run() {
-        await this.parse(BranchCleanupCommand);
-        this.timer.start("total");
-        this.timer.start("response");
-
-        const git = getSimpleGit();
-        this.spinner.start();
-        this.spinner.text = "Fetching repository...";
-        try { await git.fetch(['--all']); } catch { LOGGER.warn(this, `Error fetching repository.`); }
-
-        const { divergedBranches, mergedBranches, staleBranches, behindOnlyBranches, localOnlyBranches } = await this.getBranchCandidatesPerType()
-        if (
-            mergedBranches.size === 0 &&
-            staleBranches.size === 0 &&
-            behindOnlyBranches.size === 0 &&
-            localOnlyBranches.size === 0 &&
-            divergedBranches.size === 0
-        ) {
+        if (mergedBranches.size === 0 && staleBranches.size === 0 && behindOnlyBranches.size === 0 && localOnlyBranches.size === 0 && divergedBranches.size === 0) {
             LOGGER.log(this, "✅ No cleanup candidates found.");
             this.logTotalTime();
             return;
         }
 
+        const items: ListItem<string>[] = [];
 
-        if (allBranchesToDelete.length > 0) {
+        if (mergedBranches.size > 0) {
+            items.push({ label: `Merged Branches (${mergedBranches.size})`, type: "separator" });
+            const sorted = [...mergedBranches.entries()].sort((a, b) => (this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0) - (this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0));
+            items.push(...sorted.map(([branch, info]) => ({
+                key: branch, label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(info.mostRelevantBranch)} ${chalk.dim(`(${dayjs(info.lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            })));
+        }
+
+        if (behindOnlyBranches.size > 0) {
+            items.push({ label: `Only pending pulls (Behind)`, type: "separator" });
+            items.push(...[...behindOnlyBranches.entries()].map(([branch, info]) => ({
+                key: branch, label: `${chalk.blue(branch)} ${chalk.dim(`(↓${info.behindCount}, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            })));
+        }
+
+        if (divergedBranches.size > 0) {
+            items.push({ label: `Outdated & Diverged Branches (WARNING: Local changes!)`, type: "separator" });
+            items.push(...[...divergedBranches.entries()].map(([branch, info]) => {
+                const aheadColor = info.ahead > 10 ? chalk.red : chalk.yellow;
+                const behindColor = info.behind > 50 ? chalk.red : chalk.blue;
+                return {
+                    key: branch,
+                    label: `${chalk.red.bold(branch)} ${chalk.dim("(")}${aheadColor(`↑${info.ahead}`)} ${behindColor(`↓${info.behind}`)}${chalk.dim(`, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
+                    type: "item" as const,
+                    value: branch
+                };
+            }));
+        }
+
+        if (localOnlyBranches.size > 0) {
+            items.push({ label: `Local branches without remote`, type: "separator" }, ...[...localOnlyBranches.entries()].map(([branch, lastCommitDate]) => ({
+                key: branch, label: `${chalk.magenta(branch)} ${chalk.dim(`(Local only, active: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            })));
+        }
+
+        if (staleBranches.size > 0) {
+            items.push({ label: `Stale branches (>30 days, synced)`, type: "separator" }, ...[...staleBranches.entries()].map(([branch, lastCommitDate]) => ({
+                key: branch, label: `${chalk.gray(branch)} ${chalk.dim(`(Synced, active: ${dayjs(lastCommitDate).fromNow()})`)}`, type: "item" as const, value: branch
+            })));
+        }
+
+        const branchesToDelete = await withPromptExit(this, () => renderCheckboxList({ items, message: "Select branches to delete:" }));
+
+        if (branchesToDelete.length > 0) {
             this.spinner.start();
-            let totalDeleted = 0;
-
-            for (const branch of allBranchesToDelete) {
+            for (const branch of branchesToDelete) {
+                // For diverged branches we use -D instead of -d to force delete despite missing merge
+                const isDiverged = divergedBranches.has(branch) || localOnlyBranches.has(branch);
                 try {
-                    await git.branch(["-D", branch]);
+                    await git.branch([isDiverged ? "-D" : "-d", branch]);
                     LOGGER.log(this, `${chalk.red("✗")} Deleted: ${branch}`);
-                    totalDeleted++;
-                } catch (error) {
+                }
+                catch (error) {
                     LOGGER.error(this, `Error deleting branch ${branch}: ${error}`);
                 }
             }
 
             this.spinner.stop();
-            LOGGER.log(this, `${chalk.green("✓")} Successfully deleted ${totalDeleted} branches!`);
-        } else {
-            LOGGER.log(this, "✅ No branches were deleted.");
+            LOGGER.log(this, `${chalk.green("✓")} Successfully deleted ${branchesToDelete.length} branches!`);
         }
 
         this.logTotalTime();
     }
 
-    getAllBranchesToDelete() {
-        const categories: { label: string; map: Map<any, any> | Map<string, number>; }[] = [
-            { label: "Merged Branches", map: mergedBranches },
-            { label: "Only pending pulls (Behind)", map: behindOnlyBranches },
-            { label: "Outdated & Diverged Branches (WARNING: Local changes!)", map: divergedBranches },
-            { label: "Local branches without remote", map: localOnlyBranches },
-            { label: "Stale branches (>30 days, synced)", map: staleBranches },
-        ];
-
-        const allBranchesToDelete: string[] = [];
-
-        for (const category of categories) {
-            if (category.map.size === 0) continue;
-
-            const items: ListItem<string>[] = [];
-
-            switch (category.label) {
-                case "Local branches without remote": {
-                    items.push(...[...category.map.entries()].map(([branch, lastCommitDate]) => ({
-                        key: branch,
-                        label: `${chalk.magenta(branch)} ${chalk.dim(`(Local only, active: ${dayjs(lastCommitDate).fromNow()})`)}`,
-                        type: "item" as const,
-                        value: branch
-                    })));
-
-                    break;
-                }
-
-                case "Merged Branches": {
-                    const sorted = [...category.map.entries()].sort(
-                        (a, b) =>
-                            (this.branchImportanceScore.get(b[1].mostRelevantBranch) ?? 0) -
-                            (this.branchImportanceScore.get(a[1].mostRelevantBranch) ?? 0)
-                    );
-                    items.push(...sorted.map(([branch, info]) => ({
-                        key: branch,
-                        label: `${chalk.yellow(branch)} ${chalk.dim("→")} ${chalk.green(info.mostRelevantBranch)} ${chalk.dim(`(${dayjs(info.lastCommitDate).fromNow()})`)}`,
-                        type: "item" as const,
-                        value: branch
-                    })));
-
-                    break;
-                }
-
-                case "Only pending pulls (Behind)": {
-                    items.push(...[...category.map.entries()].map(([branch, info]) => ({
-                        key: branch,
-                        label: `${chalk.blue(branch)} ${chalk.dim(`(↓${info.behindCount}, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
-                        type: "item" as const,
-                        value: branch
-                    })));
-
-                    break;
-                }
-
-                case "Outdated & Diverged Branches (WARNING: Local changes!)": {
-                    items.push(...[...category.map.entries()].map(([branch, info]) => {
-                        const aheadColor = info.ahead > 10 ? chalk.red : chalk.yellow;
-                        const behindColor = info.behind > 50 ? chalk.red : chalk.blue;
-                        return {
-                            key: branch,
-                            label: `${chalk.red.bold(branch)} ${chalk.dim("(")}${aheadColor(`↑${info.ahead}`)} ${behindColor(`↓${info.behind}`)}${chalk.dim(`, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
-                            type: "item" as const,
-                            value: branch
-                        };
-                    }));
-
-                    break;
-                }
-
-                case "Stale branches (>30 days, synced)": {
-                    items.push(...[...category.map.entries()].map(([branch, lastCommitDate]) => ({
-                        key: branch,
-                        label: `${chalk.gray(branch)} ${chalk.dim(`(Synced, active: ${dayjs(lastCommitDate).fromNow()})`)}`,
-                        type: "item" as const,
-                        value: branch
-                    })));
-
-                    break;
-                }
-            }
-
-            const branchesToDelete = this.flags.yes ? items.map(item => item.) : (await withPromptExit(this, () =>
-                renderCheckboxList({ items, message: `Select branches to delete: ${category.label}` })
-            ));
-
-            allBranchesToDelete.push(...branchesToDelete);
-        }
-
-    }
-
     selectMostRelevantBranch(branches: string[]): string {
         if (branches.length === 0) return "";
-        return branches.reduce((mostRelevant, current) =>
-            (this.branchImportanceScore.get(current) ?? 0) > (this.branchImportanceScore.get(mostRelevant) ?? 0)
-                ? current
-                : mostRelevant
-        );
+        return branches.reduce((mostRelevant, current) => (this.branchImportanceScore.get(current) ?? 0) > (this.branchImportanceScore.get(mostRelevant) ?? 0) ? current : mostRelevant);
     }
 }
