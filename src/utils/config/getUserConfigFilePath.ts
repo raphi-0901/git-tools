@@ -7,7 +7,25 @@ import { ConfigurationFileParams } from "../../types/ConfigurationFile.js";
 import * as LOGGER from "../logging.js";
 import { configFileNames } from "./constants.js";
 
-export async function getUserConfigFilePath(ctx: BaseCommand, params: ConfigurationFileParams) {
+/**
+ * Searches for a user configuration file in a given directory.
+ * Tries all supported configuration file names for the current `configId`.
+ *
+ * @param {BaseCommand} ctx - The command context, providing access to `configId` and logging utilities.
+ * @param {ConfigurationFileParams} params - Parameters defining where and how to look for the config file.
+ * @param {string} params.rootDir - The directory in which to search for the configuration file.
+ *
+ * @returns {Promise<string | null>} The full path to the found configuration file, or `null` if none exists.
+ *
+ * @example
+ * const configPath = await getUserConfigFilePath(ctx, { rootDir: process.cwd() });
+ * if (!configPath) {
+ *   console.log("No configuration file found.");
+ * } else {
+ *   console.log("Found config file at:", configPath);
+ * }
+ */
+export async function getUserConfigFilePath(ctx: BaseCommand, params: ConfigurationFileParams): Promise<null | string> {
     const possibleConfigFileNames = configFileNames(ctx.configId);
 
     let configPath: null | string = null;

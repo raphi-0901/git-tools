@@ -1,6 +1,7 @@
 import { isProtectedBranch } from "./branchProtection.js";
 import { calculateAbsoluteDayDifference } from "./calculateAbsoluteDayDifference.js";
 import { getRemoteNames } from "./getRemoteNames.js";
+import { stripRemotePrefix } from "./stripRemotePrefix.js";
 
 type BranchTargetIdentificationOptions = {
     /** List of all branches in the repository */
@@ -9,7 +10,7 @@ type BranchTargetIdentificationOptions = {
     /** Map of branch name -> commit count */
     branchToCommitCountCache: Map<string, number>;
 
-    /** Map of branch name -> last commit timestamp in milliseconds */
+    /** Map of branch name -> last commit timestamp (in milliseconds) */
     branchToLastCommitDateCache: Map<string, number>;
 
     /** Regular expression patterns for protected branches */
@@ -48,8 +49,33 @@ const NAME_RULES: Array<[RegExp, number]> = [
 ];
 
 /**
- * Identifies and ranks potential target branches (e.g., merge or base branches)
- * based on repository activity, naming conventions, and protection rules.
+ * Identifies and ranks potential target branches in a repository
+ * based on:
+ * - Branch naming conventions (main, develop, release, feature, etc.)
+ * - Commit history (volume and recency)
+ * - Protected branch rules
+ *
+ * The returned branches are:
+ * - Deduplicated by normalized name (remote prefix removed)
+ * - Scored according to activity, protection, and naming rules
+ * - Limited to a maximum of `SCORE.MAX_RESULTS` branches
+ * - Filtered to exclude branches with a score below `SCORE.MIN_SCORE`
+ *
+ * @param {BranchTargetIdentificationOptions} options - Options for identifying target branches
+ * @param {string[]} options.allBranches - All branches in the repository
+ * @param {Map<string, number>} options.branchToCommitCountCache - Map of branch -> commit count
+ * @param {Map<string, number>} options.branchToLastCommitDateCache - Map of branch -> last commit timestamp
+ * @param {readonly RegExp[]} options.protectedBranchPatterns - Regex patterns to mark protected branches
+ *
+ * @returns {Promise<string[]>} A list of branch names, ranked from highest to lowest score
+ *
+ * @example
+ * const targets = await identifyPotentialTargetBranches({
+ *   allBranches: ["main", "feature/login", "develop"],
+ *   branchToCommitCountCache: new Map([["main", 100], ["develop", 50], ["feature/login", 5]]),
+ *   branchToLastCommitDateCache: new Map([["main", 1670000000000], ["develop", 1671000000000], ["feature/login", 1672000000000]]),
+ *   protectedBranchPatterns: [/^main$/, /^develop$/]
+ * });
  */
 export async function identifyPotentialTargetBranches(
     options: BranchTargetIdentificationOptions
@@ -95,16 +121,13 @@ export async function identifyPotentialTargetBranches(
 }
 
 /* ------------------------ helpers ------------------------ */
-function stripRemotePrefix(branch: string, remotes: string[]): string {
-    for (const remote of remotes) {
-        if (branch.startsWith(`${remote}/`)) {
-            return branch.slice(remote.length + 1);
-        }
-    }
 
-    return branch;
-}
-
+/**
+ * Scores a branch based on its signals.
+ *
+ * @param {BranchSignals} signals - Signals for the branch
+ * @returns {number} Branch score
+ */
 function scoreBranch(signals: BranchSignals): number {
     let score = 0;
 

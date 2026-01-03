@@ -3,10 +3,10 @@ import dayjs from "dayjs";
 
 import { BaseCommand } from "../base-commands/BaseCommand.js";
 import { BehindInfo } from "../types/BehindInfo.js";
-import { BranchAnalysisResult } from "../types/BranchAnalysisResult.js";
 import { DivergedInfo } from "../types/DivergedInfo.js";
 import { MergeInfo } from "../types/MergeInfo.js";
 import { renderCheckboxList } from "../ui/CheckboxList.js";
+import { BranchAnalysisResult } from "./branchAnalyzer.js";
 import { withPromptExit } from "./withPromptExist.js";
 
 type MapValue<T> = T extends Map<unknown, infer V> ? V : never;
@@ -32,11 +32,33 @@ type BranchCategoryMap = {
 
 type BranchCategory = BranchCategoryMap[keyof BranchCategoryMap];
 
+/**
+ * Prompts the user to select branches to delete based on analysis categories.
+ *
+ * Categories include:
+ * - Merged branches
+ * - Behind (pending pull) branches
+ * - Diverged/outdated branches
+ * - Local-only branches
+ * - Stale branches
+ *
+ * If `autoConfirm` is true, all branches from all categories are automatically selected.
+ *
+ * @param {BaseCommand} ctx - The command context for logging and prompts.
+ * @param {BranchAnalysisResult} analysis - Object containing branch categories and their info.
+ * @param {boolean} autoConfirm - If true, returns all branches automatically without prompting.
+ *
+ * @returns {Promise<string[]>} A list of branch names that the user confirmed for deletion.
+ *
+ * @example
+ * const branchesToDelete = await promptBranchesToDelete(ctx, analysis, false);
+ * console.log("Branches to delete:", branchesToDelete);
+ */
 export async function promptBranchesToDelete(
     ctx: BaseCommand,
     analysis: BranchAnalysisResult,
     autoConfirm: boolean,
-) {
+): Promise<string[]> {
     const { behindOnly, diverged, localOnly, merged, stale } = analysis;
 
     if (autoConfirm) {
@@ -107,6 +129,16 @@ export async function promptBranchesToDelete(
     return [...branchesToDelete];
 }
 
+/**
+ * Prompts the user with a checkbox list for a single branch category.
+ *
+ * @param {BaseCommand} ctx - The command context for rendering the prompt.
+ * @param {BranchCategory} category - The category of branches to display.
+ *
+ * @returns {Promise<string[]>} The branches selected by the user in this category.
+ *
+ * @internal
+ */
 async function promptBranchCategory(
     ctx: BaseCommand,
     category: BranchCategory

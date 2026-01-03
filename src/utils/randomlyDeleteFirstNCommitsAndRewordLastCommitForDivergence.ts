@@ -2,6 +2,18 @@ import { BaseCommand } from "../base-commands/BaseCommand.js";
 import { getSimpleGit } from "./getSimpleGit.js";
 import * as LOGGER from "./logging.js";
 
+/**
+ * Randomly deletes the first N commits on a branch and rewords the last commit
+ * to intentionally diverge its history.
+ *
+ * - Ensures the branch exists locally before proceeding.
+ * - Keeps at least 2 commits to prevent empty history.
+ * - Amends the last commit message by appending `(rw)`.
+ *
+ * @param ctx The command context used for logging.
+ * @param branchName The name of the branch to modify.
+ * @throws Will throw an error if the branch does not exist locally.
+ */
 export async function randomlyDeleteFirstNCommitsAndRewordLastCommitForDivergence(
     ctx: BaseCommand,
     branchName: string
