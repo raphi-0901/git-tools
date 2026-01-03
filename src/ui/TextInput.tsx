@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import React, { useEffect, useState } from "react";
 
 import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
+import { renderCancelledQuestion } from "./helper/renderCancelledQuestion.js";
 import { renderQuestion } from "./helper/renderQuestion.js";
 import { renderInkComponent } from "./renderInkComponent.js";
 
@@ -62,7 +63,7 @@ function TextInputWithCancel({
     }, [isSubmitting, isCancelling]);
 
     if (isCancelling) {
-        return <Text>Cancelling…</Text>;
+        return renderCancelledQuestion(message)
     }
 
     if (isSubmitting) {
