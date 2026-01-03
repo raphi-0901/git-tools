@@ -142,8 +142,6 @@ Strict rules:
 - A refinement request includes words like:
   "longer", "shorter", "more detail", "less detail", "different prefix", 
   "add X", "remove Y", "change Z", etc.
-- A refinement MUST always produce a properly formatted branch name,
-  not a doubled or corrupted string.
 `,
                 role: "system",
             },

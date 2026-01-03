@@ -86,12 +86,10 @@ export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitComm
             )
         };
         const diff = await diffAnalyzer(diffAnalyzerParams);
-        LOGGER.debug(this, `Diff takes ${countTokens(diff)} tokens: ${diff}`)
+        LOGGER.debug(this, `Diff takes ${countTokens(diff)} tokens:\n${diff}`)
 
-        initialMessages.push({
-            content: diff,
-            role: "user",
-        })
+        // append to first user message
+        initialMessages[1].content += "\n\n" + diff
 
         const chat = new LLMChat(finalGroqApiKey, initialMessages)
 
@@ -169,14 +167,13 @@ Strict rules:
             },
             {
                 content: `
-Create a commit message using the following information:
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
-Examples of good Commit Messages: 
-${examples.join("\n\n")}
- 
-Diffs of Staged Files:
-                `,
+${examples.length > 0 
+                    ? "Examples of Good Commit Messages: \n" + examples.join("\n") + "\n\n"
+                    : ""
+                }
+`,
                 role: "user",
             },
         ] as ChatMessage[];

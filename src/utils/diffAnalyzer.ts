@@ -1,7 +1,21 @@
 import { getSimpleGit } from "./getSimpleGit.js";
-import { decode, encode, isWithinTokenLimit } from "./gptTokenizer.js";
+import { encode } from "./gptTokenizer.js";
 
-async function diffFilesPerType(params: DiffAnalyzerParams) {
+type FilesPerDiffType = {
+    deletedFiles: Set<string>;
+    ignoredFilesStats: Set<string>;
+    nonSyntacticChangesFiles: Set<string>;
+    relevantDiffs: Set<string>;
+}
+
+/**
+ * Computes diffs for files in a commit or staged changes, categorizing them by status,
+ * ignored files, and non-syntactic changes.
+ *
+ * @param {DiffAnalyzerParams} params - Parameters for analyzing diffs.
+ * @returns {Promise<FilesPerDiffType>} Object containing sets of deleted files, ignored files stats, non-syntactic changes, and relevant diffs.
+ */
+async function diffFilesPerType(params: DiffAnalyzerParams): Promise<FilesPerDiffType> {
     const git = getSimpleGit();
     const isStaged = params.type === "commit";
     const baseArgs = isStaged
@@ -116,15 +130,23 @@ export type DiffAnalyzerParams = {
     type: "commit",
 }
 
-export async function diffAnalyzer(params: DiffAnalyzerParams) {
+/**
+ * Analyzes diffs and formats them for LLM consumption.
+ *
+ * @param {DiffAnalyzerParams} params - The parameters are controlling which diffs to analyze.
+ * @returns {Promise<string>} Formatted diff output including relevant changes, deleted files, and ignored files stats.
+ */
+export async function diffAnalyzer(params: DiffAnalyzerParams): Promise<string> {
     const INCLUDE_MAXIMAL_FILE_COUNT = 5;
     const { deletedFiles, ignoredFilesStats, nonSyntacticChangesFiles, relevantDiffs } = await diffFilesPerType(params)
 
-    const filteredDiffs: string[] = ["Diffs:"]
+    const filteredDiffs: string[] = []
     if (relevantDiffs.size > 0) {
         filteredDiffs.push(
             ...[...relevantDiffs].map((diff, index) => `${"\n".repeat(Math.min(1, index))}${filterDiffForLLM(diff)}`)
         )
+    } else {
+        filteredDiffs.push("No relevant changes found.")
     }
 
     const fixedParts: string[][] = []
@@ -156,7 +178,7 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
 
     if (ignoredFilesStats.size > 0) {
         const message = [
-            "\n\nFiles that are ignored because they are likely to be generated or lock files:",
+            "\n\nFiles with generated content:",
             ignoredFilesStats.values().take(INCLUDE_MAXIMAL_FILE_COUNT).toArray().join("\n"),
         ]
 
@@ -168,12 +190,24 @@ export async function diffAnalyzer(params: DiffAnalyzerParams) {
     }
 
     const fixedPartsString = fixedParts.flatMap(message => message.flat()).join("\n")
-    const tokensForFixedParts = encode(fixedPartsString).length;
+    const diffHeader = "Diffs:"
+    const tokensForFixedParts = encode(fixedPartsString).length + encode(diffHeader).length;
     const diffsWithinTokenLimit = fitDiffsWithinTokenLimit(filteredDiffs, params.remainingTokens - tokensForFixedParts).join("\n").trim()
 
-    return diffsWithinTokenLimit + fixedPartsString
+    return `
+${diffHeader}
+${diffsWithinTokenLimit}
+${fixedPartsString}
+`.trim()
 }
 
+/**
+ * Checks whether a file should be included for diff analysis.
+ *
+ * @param {string} file - File path.
+ * @param {string[]} [ignorePatterns] - Optional array of glob patterns to ignore.
+ * @returns {boolean} True if the file should be included, false otherwise.
+ */
 function shouldIncludeFile(file: string, ignorePatterns: string[] = [
     "package-lock.json",
     "pnpm-lock.yaml",
@@ -183,7 +217,7 @@ function shouldIncludeFile(file: string, ignorePatterns: string[] = [
     "dist/**",
     "build/**",
     "node_modules/**",
-]) {
+]): boolean {
     return !ignorePatterns.some(pattern => {
         if (pattern.includes("*")) {
             const regex = new RegExp("^" + pattern.replaceAll('**', ".*").replaceAll('*', "[^/]*") + "$");
@@ -195,118 +229,190 @@ function shouldIncludeFile(file: string, ignorePatterns: string[] = [
 }
 
 /**
- * Filters a git diff for LLM input to minimize tokens:
- * - Keeps changed lines (+/-) and limited context
- * - Keeps @@ lines but strips the position info (only keeps trailing context)
- * - Removes index, binary, and other metadata lines
- * - Keeps file headers (diff --git)
+ * Determines whether a line in a diff represents a meaningful change.
+ *
+ * @param {string} line - A line from a diff.
+ * @returns {boolean} True if the line is a meaningful addition or deletion.
  */
-function filterDiffForLLM(diff: string): string {
+function isMeaningfulChange(line: string): boolean {
+    return (line.startsWith("+") || line.startsWith("-")) &&
+    !line.startsWith("+++ ") &&
+    !line.startsWith("--- ") &&
+    line.slice(1).trim() !== "";
+}
+
+/**
+ * Determines whether a line in a diff is an empty change.
+ *
+ * @param {string} line - A line from a diff.
+ * @returns {boolean} True if the line is an addition or deletion with no content.
+ */
+function isEmptyChangeLine(line: string): boolean {
+    return (line.startsWith("+") || line.startsWith("-")) && line.slice(1).trim() === "";
+}
+
+/**
+ * Filters a diff to only include meaningful hunks and removes empty or irrelevant lines.
+ *
+ * @param {string} diff - Raw git diff for a file.
+ * @returns {string} Filtered diff suitable for LLM consumption.
+ */
+export function filterDiffForLLM(diff: string): string {
     const lines = diff.split("\n");
-    const keep: string[] = [];
-    const contextRadius = 2;
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+    const result: string[] = [];
+    let currentHunk: string[] = [];
+    let inHunk = false;
+    let hunkHasChanges = false;
 
-        // Skip other metadata
-        if (/^(index|Binary files|old mode|new mode)/.test(line)) {
+    const flushHunk = () => {
+        if (inHunk && hunkHasChanges) {
+            result.push(...currentHunk);
+        }
+
+        currentHunk = [];
+        hunkHasChanges = false;
+        inHunk = false;
+    };
+
+    for (const line of lines) {
+        // Start of new hunk
+        if (line.startsWith("@@")) {
+            flushHunk();
+            inHunk = true;
+
+            const context = line.replace(/^@@.*@@ ?/, "").trim();
+            const marker = context ? `@@ ${context}` : "@@";
+            currentHunk.push(marker);
             continue;
         }
 
-        // Keep file headers
-        if (line.startsWith('diff --git ')) {
-            keep.push(line);
-            continue;
-        }
+        // File-level headers
+        if (!inHunk) {
+            if (line.startsWith("diff --git")) {
+                const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
 
-        // Handle @@ lines: keep only context text after them
-        if (line.startsWith('@@')) {
-            const cleaned = line.replace(/^@@.*@@ ?/, "").trim();
-            if (cleaned.length > 0) {
-                keep.push(cleaned);
-            }
+                if (match) {
+                    const [, left, right] = match;
 
-            continue;
-        }
+                    if (left === right) {
+                        result.push(`diff ${left}`);
+                    } else {
+                        // rename or move -> keep full info
+                        result.push(`diff ${left} ${right}`);
+                    }
+                } else {
+                    result.push(line);
+                }
 
-        // Keep modified lines and a few context ones
-        if (/^[+-]/.test(line)) {
-            if (line.startsWith('+++') || line.startsWith('---')) {
                 continue;
             }
 
-            const start = Math.max(0, i - contextRadius);
-            const end = Math.min(lines.length, i + contextRadius + 1);
-            for (let j = start; j < end; j++) {
-                const neighbor = lines[j];
-                if (/^(index|@@|Binary files|old mode|new mode)/.test(neighbor)) {
-                    continue
-                }
-
-                if (!keep.includes(neighbor)) {
-                    keep.push(neighbor);
-                }
-            }
+            continue;
         }
+
+        // Skip empty + / - lines entirely
+        if (isEmptyChangeLine(line)) {
+            continue;
+        }
+
+        // Detect meaningful change
+        if (isMeaningfulChange(line)) {
+            hunkHasChanges = true;
+        }
+
+        // check for empty context lines
+        if(line.trim() === "") {
+            continue;
+        }
+
+        // Keep line (context or meaningful change)
+        currentHunk.push(line);
     }
 
-    return keep.join("\n").trim();
+    flushHunk();
+
+    return result.join("\n").trim();
 }
 
-
 /**
- * Fit diffs within a given token limit.
+ * Truncates an array of diffs to fit within a token limit.
  *
- * @param diffs An array of diffs.
- * @param maxTokens The maximum total number of tokens allowed.
- * @returns A trimmed version of `diffs`, ensuring total tokens stay within the limit.
+ * @param {string[]} diffs - Array of diff strings.
+ * @param {number} maxTokens - Maximum allowed token count.
+ * @returns {string[]} Filtered and truncated diffs.
  */
-function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number) {
-    // Attach original indices to each diff and sort by diff length (shortest first)
+function fitDiffsWithinTokenLimit(diffs: string[], maxTokens: number): string[] {
+    // Minimal meaningful diff size (in tokens)
+    const MIN_TOKENS_PER_DIFF = 50;
+
+    // Maximal number of diffs to consider with structure-aware truncation
+    const diffCap = Math.min(Math.floor(maxTokens / MIN_TOKENS_PER_DIFF), diffs.length);
+
+    // Attach original indices and sort by token count (smallest first)
     const sortedDiffs = diffs
-        .map((diffText, originalIndex) => ({ diffText, originalIndex }))
-        .sort((a, b) => a.diffText.length - b.diffText.length);
+        .map((diffText, originalIndex) => ({
+            diffText,
+            originalIndex,
+            tokenCount: encode(diffText).length
+        }))
+        .sort((a, b) => a.tokenCount - b.tokenCount)
+        .slice(0, diffCap);
 
     let tokensLeft = maxTokens;
     let avgTokensPerDiff = tokensLeft / sortedDiffs.length;
     const keptDiffs: { diffText: string; originalIndex: number }[] = [];
 
-    // TODO: handle case where there are far too many diffs —
-    // could discard extras or use LLM-based prioritization.
-
-    for (const [diffIndex, { diffText, originalIndex }] of sortedDiffs.entries()) {
-        const fitsWithinLimit = isWithinTokenLimit(diffText, avgTokensPerDiff);
-
-        // console.log('---------------------------------------');
-        // console.log('fitsWithinLimit :>>', fitsWithinLimit);
-        // console.log('tokensLeft :>>', tokensLeft);
-        // console.log('avgTokensPerDiff :>>', avgTokensPerDiff);
-
-        if (fitsWithinLimit === false) {
-            // const tokenCount = encode(diffText).length;
-            // console.log('tokenCount :>>', tokenCount);
-
-            // TODO: consider trimming equally from start and end while preserving diff headers
-            const trimmedDiff = decode(encode(diffText).slice(0, avgTokensPerDiff));
-            keptDiffs.push({ diffText: trimmedDiff, originalIndex });
-            tokensLeft -= avgTokensPerDiff;
-        } else {
-            keptDiffs.push({ diffText, originalIndex });
-            tokensLeft -= fitsWithinLimit;
+    for (const [diffIndex, { diffText, originalIndex, tokenCount }] of sortedDiffs.entries()) {
+        // Not enough tokens for meaningful diff
+        if (tokensLeft < MIN_TOKENS_PER_DIFF) {
+            break;
         }
 
-        // console.log('---------------------------------------');
+        // Determine how many tokens this diff can get
+        const allowedTokens = Math.min(tokenCount, Math.floor(avgTokensPerDiff), tokensLeft);
 
-        const remainingDiffs = diffs.length - 1 - diffIndex;
+        // Structure-aware truncation
+        const truncatedDiff = allowedTokens < tokenCount
+            ? truncateDiffPerLine(diffText, allowedTokens)
+            : diffText;
+
+        keptDiffs.push({ diffText: truncatedDiff, originalIndex });
+        tokensLeft -= encode(truncatedDiff).length;
+
+        const remainingDiffs = sortedDiffs.length - 1 - diffIndex;
         if (remainingDiffs > 0) {
             avgTokensPerDiff = tokensLeft / remainingDiffs;
         }
     }
 
-    // Restore the original order within the section
+    // Restore original order
     keptDiffs.sort((a, b) => a.originalIndex - b.originalIndex);
 
-    // Return only the diff text strings, in section structure
-    return keptDiffs.map(diff => diff.diffText);
+    return keptDiffs.map(d => d.diffText);
+}
+
+/**
+ * Truncates a diff line-by-line until reaching a maximum token count.
+ *
+ * @param {string} diffText - Raw diff text.
+ * @param {number} maxTokens - Maximum tokens allowed.
+ * @returns {string} Truncated diff text.
+ */
+function truncateDiffPerLine(diffText: string, maxTokens: number): string {
+    const lines = diffText.split("\n");
+    const resultLines: string[] = [];
+    let tokenCount = 0;
+
+    for (const line of lines) {
+        const lineTokens = encode(line).length;
+        if (tokenCount + lineTokens > maxTokens) {
+            break;
+        }
+
+        resultLines.push(line);
+        tokenCount += lineTokens;
+    }
+
+    return resultLines.join("\n");
 }
