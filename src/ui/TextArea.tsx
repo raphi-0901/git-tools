@@ -64,7 +64,6 @@ export const TextArea = ({ defaultValue, height = 6, onChange }: InkFormProps) =
         };
     }
 
-
     function reducer(state: EditorState, action: Action): EditorState {
         const { cursor, lineIndex, lines } = state;
 

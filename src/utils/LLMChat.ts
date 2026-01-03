@@ -71,7 +71,6 @@ export class LLMChat {
         this.messages = [...messages];
     }
 
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins
     private getRemainingTokensFromHeader(response: Response) {
         return Number(response.headers.get("x-ratelimit-remaining-tokens")) || MAX_TOKENS;
     }

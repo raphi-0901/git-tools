@@ -6,8 +6,24 @@ import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { LLMChat } from "./LLMChat.js";
 import * as LOGGER from "./logging.js";
 
-export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey: string) {
-    ctx.spinner.text = "Checking validity of GROQ API key..."
+/**
+ * Ensures a valid GROQ API key is available for use with the LLM.
+ *
+ * - Checks the validity of the provided API key by attempting to retrieve remaining tokens.
+ * - If the key is invalid (401), prompts the user to enter a new key.
+ * - Retries until a valid key is obtained or an unexpected error occurs.
+ *
+ * @param ctx The command context, used for logging, spinner, and prompting.
+ * @param initialGroqApiKey The initial GROQ API key to validate.
+ * @returns A promise that resolves to an object containing:
+ *          - `groqApiKey`: a valid GROQ API key
+ *          - `remainingTokensForLLM`: the number of remaining tokens available for the LLM
+ */
+export async function obtainValidGroqApiKey(
+    ctx: BaseCommand,
+    initialGroqApiKey: string
+) {
+    ctx.spinner.text = "Checking validity of GROQ API key...";
 
     let remainingTokensForLLM: null | number = null;
     let groqApiKey = initialGroqApiKey;
@@ -19,12 +35,12 @@ export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey:
             remainingTokensForLLM = await chat.getRemainingTokens();
             ctx.spinner.stop();
 
-            LOGGER.debug(ctx, `Remaining tokens for LLM: ${remainingTokensForLLM}`)
+            LOGGER.debug(ctx, `Remaining tokens for LLM: ${remainingTokensForLLM}`);
             break;
         } catch (error) {
             // wait a bit before retrying
-            await new Promise(resolve => {
-                setTimeout(resolve, 1000)
+            await new Promise((resolve) => {
+                setTimeout(resolve, 1000);
             });
             ctx.spinner.stop();
 
@@ -32,7 +48,7 @@ export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey:
                 LOGGER.warn(ctx, "Your GROQ_API_KEY is invalid. Please provide a new one.");
 
                 groqApiKey = await promptForTextConfigValue(ctx, {
-                    schema: GroqApiKeySchema
+                    schema: GroqApiKeySchema,
                 });
                 chat = new LLMChat(groqApiKey);
             } else {
@@ -43,6 +59,6 @@ export async function obtainValidGroqApiKey(ctx: BaseCommand, initialGroqApiKey:
 
     return {
         groqApiKey,
-        remainingTokensForLLM
-    }
+        remainingTokensForLLM,
+    };
 }

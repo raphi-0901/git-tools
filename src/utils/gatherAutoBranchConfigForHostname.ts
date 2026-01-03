@@ -5,7 +5,22 @@ import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { SIGINT_ERROR_NUMBER } from "./constants.js";
 import { getSchemaForUnionOfAutoBranch } from "./getSchemaForUnionOfAutoBranch.js";
 
-// TODO maybe one function for creating a new config and one for editing an existing one?
+/**
+ * Interactively gathers and builds the AutoBranch service configuration
+ * for a specific hostname.
+ *
+ * - Prompts the user to select a service type (or delete an existing one)
+ * - Dynamically reads the corresponding Zod schema for the chosen service
+ * - Prompts for each required and optional configuration field
+ * - Supports incremental updates by merging with an existing partial config
+ *
+ * @param ctx The AutoBranch command context, used for prompting and exiting.
+ * @param allHostnames A list of all currently configured hostnames.
+ * @param hostnameToAdd The hostname being added or modified.
+ * @param currentConfig An optional partial configuration to extend or modify.
+ * @returns The completed AutoBranch service configuration, or `undefined`
+ *          if the user chose to delete the hostname.
+ */
 export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, allHostnames: string[], hostnameToAdd: string, currentConfig: Partial<AutoBranchServiceConfig> = {}) {
     let newConfig: Partial<AutoBranchServiceConfig> = { ...currentConfig };
     const baseServiceChoices = AutoBranchServiceTypeValues.map((type) => ({
@@ -36,7 +51,6 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
     // get current options of service from zod
     const schemaForType = getSchemaForUnionOfAutoBranch(serviceType)!;
 
-    // todo try to fit examples into this for loop
     for (const [key, fieldSchema] of Object.entries(schemaForType.shape)) {
         if (key === "type") {
             continue

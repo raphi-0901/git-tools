@@ -13,7 +13,29 @@ import * as LOGGER from "../logging.js";
 import { fallbackConfigFileName } from "./constants.js";
 import { getUserConfigFilePath } from "./getUserConfigFilePath.js";
 
-export async function writeUserConfigToFile<T extends object>(ctx: BaseCommand, params: ConfigurationFileParamsForSave<T>) {
+/**
+ * Writes a user configuration object to a file.
+ * If a configuration file already exists, it will be overwritten.
+ * If none exists, a fallback file name is used in the specified directory.
+ *
+ * @template T - The shape of the configuration object.
+ * @param {BaseCommand} ctx - The command context, used for logging.
+ * @param {ConfigurationFileParamsForSave<T>} params - Parameters for saving the configuration.
+ * @param {string} params.rootDir - Directory to save the config file in.
+ * @param {T} params.data - The configuration object to save.
+ *
+ * @returns {Promise<void>} Resolves when the configuration has been successfully written.
+ *
+ * @example
+ * await writeUserConfigToFile<MyConfigType>(ctx, {
+ *   rootDir: process.cwd(),
+ *   data: { theme: "dark", timeout: 5000 }
+ * });
+ */
+export async function writeUserConfigToFile<T extends object>(
+    ctx: BaseCommand,
+    params: ConfigurationFileParamsForSave<T>
+): Promise<void> {
     const configPath = await getUserConfigFilePath(ctx, params);
     if (!configPath) {
         const fileNameFallback = fallbackConfigFileName(ctx.configId);
@@ -27,7 +49,30 @@ export async function writeUserConfigToFile<T extends object>(ctx: BaseCommand, 
     await writeConfigBasedOnExtension<T>(ctx, configPath, params.data);
 }
 
-async function writeConfigBasedOnExtension<T extends object>(ctx: BaseCommand, configPath: string, config: T) {
+/**
+ * Writes a configuration object to a file, automatically handling the format
+ * based on the file extension.
+ *
+ * Supported extensions:
+ * - `.js` -> JavaScript module exporting the object
+ * - `.json` -> JSON file
+ * - `.yaml` / `.yml` -> YAML file
+ * - `.toml` -> TOML file
+ *
+ * @template T - The shape of the configuration object.
+ * @param {BaseCommand} ctx - The command context, used for logging fatal errors.
+ * @param {string} configPath - Full path to the file to write.
+ * @param {T} config - The configuration object to write.
+ *
+ * @returns {Promise<void>} Resolves after writing the file. Throws/logs fatal errors on unsupported formats.
+ *
+ * @internal
+ */
+async function writeConfigBasedOnExtension<T extends object>(
+    ctx: BaseCommand,
+    configPath: string,
+    config: T
+): Promise<void> {
     const dir = path.dirname(configPath);
     fs.mkdirSync(dir, { recursive: true });
 
@@ -65,12 +110,10 @@ async function writeConfigBasedOnExtension<T extends object>(ctx: BaseCommand, c
 
     // --- TOML ---
     if (ext === "toml") {
-        // @ltd/j-toml requires specifying the Toml version
-        const tomlString = json2toml(config, { indent: 2, newlineAfterSection: true })
+        const tomlString = json2toml(config, { indent: 2, newlineAfterSection: true });
         fs.writeFileSync(configPath, tomlString, "utf8");
         return;
     }
 
     LOGGER.fatal(ctx, `Unsupported config format for saving: ${ext}. File: ${configPath}`);
 }
-
