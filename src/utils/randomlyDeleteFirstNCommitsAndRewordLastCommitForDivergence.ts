@@ -1,6 +1,8 @@
 import { BaseCommand } from "../base-commands/BaseCommand.js";
+import { deleteFirstNCommits } from "./deleteFirstNCommits.js";
 import { getSimpleGit } from "./getSimpleGit.js";
 import * as LOGGER from "./logging.js";
+import { rewordLastCommitMessage } from "./rewordLastCommitMessage.js";
 
 /**
  * Randomly deletes the first N commits on a branch and rewords the last commit
@@ -20,14 +22,13 @@ export async function randomlyDeleteFirstNCommitsAndRewordLastCommitForDivergenc
 ) {
     const git = getSimpleGit();
 
-    // 🔒 Check if branch exists locally
-    const localBranches = await git.branchLocal();
-    if (!localBranches.all.includes(branchName)) {
-        throw new Error(`Branch '${branchName}' does not exist locally`);
-    }
-
     LOGGER.log(ctx, `Checking out branch ${branchName}`);
-    await git.checkout(branchName);
+    try {
+        await git.checkout(branchName);
+    }
+    catch (error) {
+        LOGGER.fatal(ctx, `Failed to checkout branch ${branchName}: ${error}`);
+    }
 
     // Count commits on the branch
     const commitCount = Number.parseInt(
@@ -44,34 +45,6 @@ export async function randomlyDeleteFirstNCommitsAndRewordLastCommitForDivergenc
     const maxDeletable = commitCount - 2;
     const N = Math.floor(Math.random() * maxDeletable) + 1;
 
-    LOGGER.log(
-        ctx,
-        `Deleting first ${N} commits out of ${commitCount} on ${branchName}`
-    );
-
-    // Determine new root commit (skip first N commits)
-    const commits = (
-        await git.raw(["rev-list", "--reverse", "HEAD"])
-    )
-        .trim()
-        .split("\n");
-
-    const newRoot = commits[N];
-    await git.reset(["--hard", newRoot]);
-
-    LOGGER.log(ctx, `Rewording last commit on ${branchName}`);
-
-    const oldMessage = (
-        await git.raw(["log", "-1", "--pretty=%B"])
-    ).trim();
-
-    await git.raw([
-        "commit",
-        "--amend",
-        "--allow-empty",
-        "-m",
-        oldMessage + " (rw)",
-    ]);
-
-    LOGGER.log(ctx, `✔ ${branchName} history rewritten and diverged`);
+    await deleteFirstNCommits(ctx, N);
+    await rewordLastCommitMessage(ctx, (oldMessage) => oldMessage + " (rw)");
 }
