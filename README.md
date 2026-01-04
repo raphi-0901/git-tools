@@ -1,159 +1,73 @@
-git-tools
-=================
+# Installation
 
-A new CLI generated with oclif
-
-
-[![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/git-tools.svg)](https://npmjs.org/package/git-tools)
-[![Downloads/week](https://img.shields.io/npm/dw/git-tools.svg)](https://npmjs.org/package/git-tools)
-
-
-<!-- toc -->
-* [Usage](#usage)
-* [Commands](#commands)
-<!-- tocstop -->
-# Usage
-<!-- usage -->
-```sh-session
-$ npm install -g @rwirnsberger/git-tools
-$ git-tools COMMAND
-running command...
-$ git-tools (--version)
-@rwirnsberger/git-tools/1.5.1 linux-x64 node-v22.21.1
-$ git-tools --help [COMMAND]
-USAGE
-  $ git-tools COMMAND
-...
+Install the CLI globally:
+```bash
+npm install -g git-tools
 ```
-<!-- usagestop -->
+
+---
+
+# Prerequisites
+
+- **Node.js** >= 22
+- **Git** >= 2.30
+- Active internet connection
+- **Groq API key** (can be generated for free [here](https://console.groq.com/keys)
+
+---
+
 # Commands
-<!-- commands -->
-* [`git-tools auto-branch ISSUEURL`](#git-tools-auto-branch-issueurl)
-* [`git-tools auto-branch config`](#git-tools-auto-branch-config)
-* [`git-tools auto-commit`](#git-tools-auto-commit)
-* [`git-tools auto-commit config`](#git-tools-auto-commit-config)
-* [`git-tools branch-cleanup`](#git-tools-branch-cleanup)
-* [`git-tools checkout-all-remote-branches`](#git-tools-checkout-all-remote-branches)
-* [`git-tools diverge-branches`](#git-tools-diverge-branches)
 
-## `git-tools auto-branch ISSUEURL`
+## auto-commit
 
-Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
+Generate clean, conventional Git commit messages automatically from your staged changes — with an interactive feedback loop when you want fine-tuning.
+![auto-commit-usage.gif](assets/auto-commit-usage.gif)
 
-```
-USAGE
-  $ git-tools auto-branch ISSUEURL [--debug] [-y]
+---
 
-ARGUMENTS
-  ISSUEURL  Jira issue ID to fetch
+## auto-branch
 
-FLAGS
-  -y, --yes    Skip confirmation prompt
-      --debug  Show debug logs.
+Generate a Git branch with an automatically generated name based on the given issue. 
+![auto-branch-usage.gif](assets/auto-branch-usage.gif)
 
-DESCRIPTION
-  Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
-```
+Currently, the following issue providers are supported:
+- GitHub
+- GitLab
+- Jira (Personal Access Token & API Token)
 
-_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/auto-branch/index.ts)_
+The tool prompts you at the first startup for your credentials. Make sure to grant the required scopes.
 
-## `git-tools auto-branch config`
+---
 
-Opens up the configuration for the auto-branch command.
+## branch-cleanup
 
-```
-USAGE
-  $ git-tools auto-branch config
+Analyzes your local branches and tries to find branches which are obsolete.
+![branch-cleanuo-usage.gif](assets/branch-cleanup-usage.gif)
 
-DESCRIPTION
-  Opens up the configuration for the auto-branch command.
-```
+This is done by checking the merge status, last commit date and the remote tracking status. The tool will not delete any branches without your confirmation.
 
-_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/auto-branch/config.ts)_
+---
 
-## `git-tools auto-commit`
+## Configuration (Global vs. Repository)
+For the commands `auto-commit` and `auto-branch`, you can configure the tool to use your preferred output style. There is one global configuration file which is shared across all repositories, but this can be overwritten per repository.
 
-Automatically generate commit messages from staged files with feedback loop
+To locate or edit the config, run this inside a repository:
+```bash
+git-tools auto-commit config
 
-```
-USAGE
-  $ git-tools auto-commit [--debug] [-y] [--reword <value>]
-
-FLAGS
-  -y, --yes             Skip confirmation prompt
-      --debug           Show debug logs.
-      --reword=<value>  Rewords the commit message of the given commit. The commit hash must be provided.
-
-DESCRIPTION
-  Automatically generate commit messages from staged files with feedback loop
+# or
+git-tools auto-branch config
 ```
 
-_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/auto-commit/index.ts)_
+### Recommended setup
 
-## `git-tools auto-commit config`
+#### Global config:
+- Groq API key
+- issue provider credentials
+- Your default instructions & examples
 
-Opens up the configuration for the auto-commit command.
+#### Repository config:
+- overrides for special commit conventions
+- repository-specific examples or wording rules
 
-```
-USAGE
-  $ git-tools auto-commit config
-
-DESCRIPTION
-  Opens up the configuration for the auto-commit command.
-```
-
-_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/auto-commit/config.ts)_
-
-## `git-tools branch-cleanup`
-
-```
-USAGE
-  $ git-tools branch-cleanup [--debug] [-y] [--dryRun] [-p <value>...] [--skipTargetSelection] [--staleDays <value>]
-    [--staleDaysBehind <value>] [--staleDaysDiverged <value>] [--staleDaysLocal <value>]
-
-FLAGS
-  -p, --protectedBranches=<value>...  Regex for protected branches. Will not be deleted even if they are stale.
-  -y, --yes                           Skip confirmation prompt
-      --debug                         Show debug logs.
-      --dryRun                        Run without actually deleting branches
-      --skipTargetSelection           Skip target branch selection. If set, all protected branches will be considered as
-                                      potential targets.
-      --staleDays=<value>             [default: 30] Number of days since last commit after which a branch is considered
-                                      stale. If set without staleDaysDiverged/staleDaysLocal/staleDaysBehind, those will
-                                      default to staleDays × 3.
-      --staleDaysBehind=<value>       Number of days for behind-only branches (default: staleDays)
-      --staleDaysDiverged=<value>     Number of days for diverged branches (default: staleDays × 3)
-      --staleDaysLocal=<value>        Number of days for local-only branches (default: staleDays × 3)
-```
-
-_See code: [src/commands/branch-cleanup/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/branch-cleanup/index.ts)_
-
-## `git-tools checkout-all-remote-branches`
-
-Checks out all remote branches locally
-
-```
-USAGE
-  $ git-tools checkout-all-remote-branches
-
-DESCRIPTION
-  Checks out all remote branches locally
-```
-
-_See code: [src/commands/checkout-all-remote-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/checkout-all-remote-branches/index.ts)_
-
-## `git-tools diverge-branches`
-
-Diverges every 5th branch
-
-```
-USAGE
-  $ git-tools diverge-branches
-
-DESCRIPTION
-  Diverges every 5th branch
-```
-
-_See code: [src/commands/diverge-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.1/src/commands/diverge-branches/index.ts)_
-<!-- commandsstop -->
+This keeps sensitive data and defaults in one place, while allowing fine-grained control per project.
