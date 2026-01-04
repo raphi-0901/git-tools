@@ -1,130 +1,80 @@
-git-tools
-=================
+# Auto Commit (`commit`)
 
-A new CLI generated with oclif
+Generate clean, conventional Git commit messages automatically from your staged changes — with an interactive feedback loop when you want fine-tuning.
+![auto-commit-usage.gif](assets/auto-commit-usage.gif)
+![auto-branch-usage.gif](assets/auto-branch-usage.gif)
+---
 
+## 📦 Installation
 
-[![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/git-tools.svg)](https://npmjs.org/package/git-tools)
-[![Downloads/week](https://img.shields.io/npm/dw/git-tools.svg)](https://npmjs.org/package/git-tools)
+Install the CLI globally:
 
+npm install -g git-tools
 
-<!-- toc -->
-* [Usage](#usage)
-* [Commands](#commands)
-<!-- tocstop -->
-# Usage
-<!-- usage -->
-```sh-session
-$ npm install -g @rwirnsberger/git-tools
-$ git-tools COMMAND
-running command...
-$ git-tools (--version)
-@rwirnsberger/git-tools/1.3.0 linux-x64 node-v22.21.1
-$ git-tools --help [COMMAND]
-USAGE
-  $ git-tools COMMAND
-...
-```
-<!-- usagestop -->
-# Commands
-<!-- commands -->
-* [`git-tools auto-branch ISSUEURL`](#git-tools-auto-branch-issueurl)
-* [`git-tools auto-commit`](#git-tools-auto-commit)
-* [`git-tools branch-cleanup`](#git-tools-branch-cleanup)
-* [`git-tools checkout-all-remote-branches`](#git-tools-checkout-all-remote-branches)
-* [`git-tools diverge-branches`](#git-tools-diverge-branches)
+Or use it via npx:
 
-## `git-tools auto-branch ISSUEURL`
+npx git-tools auto-commit
 
-Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
+---
 
-```
-USAGE
-  $ git-tools auto-branch ISSUEURL [--debug] [-y]
+## 🧩 Prerequisites
 
-ARGUMENTS
-  ISSUEURL  Jira issue ID to fetch
+- 🟢 **Node.js** >= 22
+- 🧰 **Git** >= 2.30
+- 🌐 Active internet connection
+- 🔑 **Groq API key** (can be generated for free [here](https://console.groq.com/keys)
 
-FLAGS
-  -y, --yes    Skip confirmation prompt
-      --debug  Show debug logs.
+---
 
-DESCRIPTION
-  Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
-```
+## ✨ Features
 
-_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.3.0/src/commands/auto-branch/index.ts)_
+- 🤖 AI-generated commit messages from staged diffs
+- 🔁 Reword existing commits
+- ✍️ Edit or give feedback before committing
+- ⚙️ Global and per-repository configuration
+- 🚀 Works directly in your terminal
 
-## `git-tools auto-commit`
+---
 
-Automatically generate commit messages from staged files with feedback loop
+## 🚀 Usage
 
-```
-USAGE
-  $ git-tools auto-commit [--debug] [-y] [--reword <value>]
+Generate a commit message:
 
-FLAGS
-  -y, --yes             Skip confirmation prompt
-      --debug           Show debug logs.
-      --reword=<value>  Rewords the commit message of the given commit. The commit hash must be provided.
+git add -A
+git-tools auto-commit
 
-DESCRIPTION
-  Automatically generate commit messages from staged files with feedback loop
-```
+Reword an existing commit:
 
-_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.3.0/src/commands/auto-commit/index.ts)_
+git-tools auto-commit --reword <commit-hash>
 
-## `git-tools branch-cleanup`
+You can accept, edit, give feedback, or cancel — all interactively.
 
-```
-USAGE
-  $ git-tools branch-cleanup [--debug] [-y] [--dryRun] [-p <value>...] [-d <value>]
+---
 
-FLAGS
-  -d, --staleDays=<value>             [default: 30] Number of days since last commit after which a branch is considered
-                                      stale
-  -p, --protectedBranches=<value>...  Regex for protected branches. Will not be deleted even if they are stale.
-  -y, --yes                           Skip confirmation prompt
-      --debug                         Show debug logs.
-      --dryRun                        Run without actually deleting branches
-```
+## ⚙️ Configuration (Global vs Repository)
 
-_See code: [src/commands/branch-cleanup/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.3.0/src/commands/branch-cleanup/index.ts)_
+Configuration can be overwritten per repository.
 
-## `git-tools checkout-all-remote-branches`
+To locate or edit the config, run this inside a repository:
 
-Checks out all remote branches locally
+git-tools auto-commit config
 
-```
-USAGE
-  $ git-tools checkout-all-remote-branches [--debug] [-y]
+You can choose between:
+- 🌍 Global config (shared across all repositories)
+- 📦 Repository config (only for the current repository)
 
-FLAGS
-  -y, --yes    Skip confirmation prompt
-      --debug  Show debug logs.
+### ✅ Recommended setup
 
-DESCRIPTION
-  Checks out all remote branches locally
-```
+Global config:
+- 🔑 GROQ_API_KEY
+- 📝 your default instructions
 
-_See code: [src/commands/checkout-all-remote-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.3.0/src/commands/checkout-all-remote-branches/index.ts)_
+Repository config:
+- 📐 overrides for special commit conventions
+- 🧩 repository-specific examples or wording rules
 
-## `git-tools diverge-branches`
+This keeps sensitive data and defaults in one place, while allowing fine-grained control per project.
 
-Diverges every 5th branch
+---
 
-```
-USAGE
-  $ git-tools diverge-branches [--debug] [-y]
-
-FLAGS
-  -y, --yes    Skip confirmation prompt
-      --debug  Show debug logs.
-
-DESCRIPTION
-  Diverges every 5th branch
-```
-
-_See code: [src/commands/diverge-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.3.0/src/commands/diverge-branches/index.ts)_
-<!-- commandsstop -->
+Happy committing 🚀
