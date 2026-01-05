@@ -20,8 +20,8 @@ type AnalyzeBranchesOptions = {
     /** Map of branch name -> last commit timestamp in milliseconds */
     branchToLastCommitDateCache: Map<string, number>;
 
-    /** Map of branch name -> remote tracking statuses */
-    localBranchToRemoteStatuses: Map<string, RemoteStatus[]>;
+    /** Map of branch name -> remote tracking status */
+    localBranchToRemoteStatuses: Map<string, RemoteStatus>;
 
     /** Branches to consider as potential merge targets */
     potentialTargets: string[];
@@ -73,14 +73,19 @@ export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<
         const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, now);
 
         let mergedInto: string = "";
-        const remoteStatuses = localBranchToRemoteStatuses.get(branch) ?? [];
+        const { ahead, behind, hasRemote, remoteBranch } = localBranchToRemoteStatuses.get(branch) ?? {
+            ahead: 0,
+            behind: 0,
+            hasRemote: false,
+            remoteBranch: null
+        };
 
         for (const target of potentialTargets) {
             if (target === branch) {
                 continue;
             }
 
-            if(remoteStatuses.some(status => status.remoteBranch === target)) {
+            if (remoteBranch === target) {
                 continue;
             }
 
@@ -98,26 +103,23 @@ export async function analyzeBranches(options: AnalyzeBranchesOptions): Promise<
             return;
         }
 
-        for (const { ahead, behind, hasRemote } of remoteStatuses) {
-            if (!hasRemote && daysSinceLastCommit > staleDays) {
-                result.localOnly.set(branch, lastCommitDate);
-                return;
-            }
+        if (!hasRemote && daysSinceLastCommit > staleDays) {
+            result.localOnly.set(branch, lastCommitDate);
+            return;
+        }
 
-            if (ahead > 0 && behind > 0 && daysSinceLastCommit > staleDays) {
-                result.diverged.set(branch, { ahead, behind, lastCommitDate });
-                return;
-            }
+        if (ahead > 0 && behind > 0 && daysSinceLastCommit > staleDays) {
+            result.diverged.set(branch, { ahead, behind, lastCommitDate });
+            return;
+        }
 
-            if (behind > 0 && ahead === 0) {
-                result.behindOnly.set(branch, { behind, lastCommitDate });
-                return;
-            }
+        if (behind > 0 && ahead === 0) {
+            result.behindOnly.set(branch, { behind, lastCommitDate });
+            return;
+        }
 
-            if (ahead === 0 && behind === 0 && daysSinceLastCommit > staleDays) {
-                result.stale.set(branch, lastCommitDate);
-                return;
-            }
+        if (ahead === 0 && behind === 0 && daysSinceLastCommit > staleDays) {
+            result.stale.set(branch, lastCommitDate);
         }
     }));
 

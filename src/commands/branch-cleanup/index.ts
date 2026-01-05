@@ -43,7 +43,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
     public readonly configId = "branch-cleanup";
     private branchToCommitCountCache = new Map<string, number>();
     private branchToLastCommitDateCache = new Map<string, number>();
-    private localBranchToRemoteStatuses = new Map<string, RemoteStatus[]>();
+    private localBranchToRemoteStatuses = new Map<string, RemoteStatus>();
 
     async buildCache(localBranches: string[], remoteBranches: string[]) {
         const allBranches = [...localBranches, ...remoteBranches];
