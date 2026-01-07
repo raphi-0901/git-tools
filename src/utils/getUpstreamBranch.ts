@@ -19,12 +19,14 @@ export async function getUpstreamBranch(branch: string): Promise<null | string> 
     const git = getSimpleGit();
 
     try {
-        return await git.raw([
+        const upstreamBranch = await git.raw([
             'rev-parse',
             '--symbolic-full-name',
             '--abbrev-ref',
             `${branch}@{u}`
         ]);
+
+        return upstreamBranch.trim();
     } catch {
         return null;
     }
