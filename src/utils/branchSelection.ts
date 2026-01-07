@@ -2,6 +2,7 @@ import chalk from "chalk";
 import dayjs from "dayjs";
 
 import { BaseCommand } from "../base-commands/BaseCommand.js";
+import BranchCleanupCommand from "../commands/branch-cleanup/index.js";
 import { BehindInfo } from "../types/BehindInfo.js";
 import { DivergedInfo } from "../types/DivergedInfo.js";
 import { MergeInfo } from "../types/MergeInfo.js";
@@ -55,7 +56,7 @@ type BranchCategory = BranchCategoryMap[keyof BranchCategoryMap];
  * console.log("Branches to delete:", branchesToDelete);
  */
 export async function promptBranchesToDelete(
-    ctx: BaseCommand,
+    ctx: BranchCleanupCommand,
     analysis: BranchAnalysisResult,
     autoConfirm: boolean,
 ): Promise<string[]> {
@@ -71,6 +72,8 @@ export async function promptBranchesToDelete(
         ];
     }
 
+    const { staleDays, staleDaysDiverged, staleDaysLocal } = ctx.userConfig;
+
     const categories: BranchCategory[] = [
         {
             branches: merged,
@@ -84,7 +87,7 @@ export async function promptBranchesToDelete(
             branches: behindOnly,
             formatLabel: (branch, info) =>
                 `${chalk.blue(branch)} ${chalk.dim(`(↓${info.behind}, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`,
-            label: `Only pending pulls (Behind)`,
+            label: `Only pending pulls (Behind) (${behindOnly.size})`,
             message: "Behind branches to delete:",
             type: "behindOnly",
         },
@@ -95,7 +98,7 @@ export async function promptBranchesToDelete(
                 const behindColor = info.behind > 50 ? chalk.red : chalk.blue;
                 return `${chalk.red.bold(branch)} ${chalk.dim("(")}${aheadColor(`↑${info.ahead}`)} ${behindColor(`↓${info.behind}`)}${chalk.dim(`, active: ${dayjs(info.lastCommitDate).fromNow()})`)}`;
             },
-            label: `Outdated & Diverged Branches (WARNING: Local changes!)`,
+            label: `Stale (>${staleDaysDiverged} days) & Diverged Branches (WARNING: Local changes!) (${diverged.size})`,
             message: "Diverged & outdated branches to delete:",
             type: "diverged",
         },
@@ -103,7 +106,7 @@ export async function promptBranchesToDelete(
             branches: localOnly,
             formatLabel: (branch, lastCommitDate) =>
                 `${chalk.magenta(branch)} ${chalk.dim(`(Local only, active: ${dayjs(lastCommitDate).fromNow()})`)}`,
-            label: `Local branches without remote`,
+            label: `Stale Local branches (>${staleDaysLocal} days) without remote counterpart (${localOnly.size})`,
             message: "Local and abandoned branches to delete:",
             type: "localOnly",
         },
@@ -111,7 +114,7 @@ export async function promptBranchesToDelete(
             branches: stale,
             formatLabel: (branch, lastCommitDate) =>
                 `${chalk.gray(branch)} ${chalk.dim(`(Synced, active: ${dayjs(lastCommitDate).fromNow()})`)}`,
-            label: `Stale branches (>30 days, synced)`,
+            label: `Stale branches (>${staleDays} days, synced) (${stale.size})`,
             message: "Stale branches to delete:",
             type: "stale",
         },

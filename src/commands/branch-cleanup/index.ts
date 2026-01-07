@@ -17,6 +17,14 @@ import * as LOGGER from "../../utils/logging.js";
 
 dayjs.extend(relativeTime);
 
+type ResolvedConfig = {
+    protectedBranchPatterns: readonly RegExp[];
+    staleDays: number;
+    staleDaysBehind: number;
+    staleDaysDiverged: number;
+    staleDaysLocal: number;
+}
+
 export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof BranchCleanupCommand> {
     static flags = {
         'dryRun': Flags.boolean({
@@ -33,17 +41,49 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         }),
         'staleDays': Flags.integer({
             aliases: ['stale-days'],
-            char: 'd',
             default: 30,
-            description: 'Number of days since last commit after which a branch is considered stale',
+            description: 'Number of days since last commit after which a branch is considered stale. If set without staleDaysDiverged/staleDaysLocal/staleDaysBehind, those will default to staleDays × 3.',
+            min: 1,
+            required: false,
+        }),
+        'staleDaysBehind': Flags.integer({
+            aliases: ['stale-days-behind'],
+            description: 'Number of days for behind-only branches (default: staleDays)',
+            min: 1,
+            required: false,
+        }),
+        'staleDaysDiverged': Flags.integer({
+            aliases: ['stale-days-diverged'],
+            description: 'Number of days for diverged branches (default: staleDays × 3)',
+            min: 1,
+            required: false,
+        }),
+        'staleDaysLocal': Flags.integer({
+            aliases: ['stale-days-local'],
+            description: 'Number of days for local-only branches (default: staleDays × 3)',
             min: 1,
             required: false,
         }),
     };
     public readonly configId = "branch-cleanup";
-    private branchToCommitCountCache = new Map<string, number>();
-    private branchToLastCommitDateCache = new Map<string, number>();
-    private localBranchToRemoteStatuses = new Map<string, RemoteStatus>();
+    private _branchToCommitCountCache = new Map<string, number>();
+    private _branchToLastCommitDateCache = new Map<string, number>();
+    private _localBranchToRemoteStatus = new Map<string, RemoteStatus>();
+    private _userConfig: ResolvedConfig = {
+        protectedBranchPatterns,
+        staleDays: 30,
+        staleDaysBehind: 30,
+        staleDaysDiverged: 90,
+        staleDaysLocal: 90,
+    }
+
+    get branchToCommitCountCache() { return this._branchToCommitCountCache; }
+
+    get branchToLastCommitDateCache() { return this._branchToLastCommitDateCache; }
+
+    get localBranchToRemoteStatus() { return this._localBranchToRemoteStatus; }
+
+    get userConfig() { return this._userConfig; }
 
     async buildCache(localBranches: string[], remoteBranches: string[]) {
         const allBranches = [...localBranches, ...remoteBranches];
@@ -54,8 +94,8 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
                     getLastCommitDate(branch),
                     getCommitCount(branch),
                 ])
-                this.branchToLastCommitDateCache.set(branch, lastCommitDate);
-                this.branchToCommitCountCache.set(branch, commitCount);
+                this._branchToLastCommitDateCache.set(branch, lastCommitDate);
+                this._branchToCommitCountCache.set(branch, commitCount);
             } catch (error) {
                 LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
             }
@@ -64,7 +104,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         const localBranchPromises = localBranches.map(async (branch) => {
             try {
                 const remoteStatus = await getRemoteStatus(branch);
-                this.localBranchToRemoteStatuses.set(branch, remoteStatus);
+                this._localBranchToRemoteStatus.set(branch, remoteStatus);
             } catch (error) {
                 LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
             }
@@ -86,12 +126,9 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
     }
 
     async run() {
-        const finalProtectedBranchPatterns = this.flags.protectedBranches
-            ? this.flags.protectedBranches.map(pattern => new RegExp(pattern))
-            : protectedBranchPatterns;
-
         this.timer.start("total");
         this.spinner.start();
+        this.storeFlagsIntoUserConfig()
 
         const git = getSimpleGit();
 
@@ -108,7 +145,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         const { allBranches, localBranches, remoteBranches } = await getBranchesSummary()
 
         // all locale branches which are not protected
-        const candidateBranches = localBranches.filter(branch => !isProtectedBranch(branch, finalProtectedBranchPatterns));
+        const candidateBranches = localBranches.filter(branch => !isProtectedBranch(branch, this._userConfig.protectedBranchPatterns));
 
         // Build cache for last commit dates and importance
         this.spinner.text = "Analyzing branch activity...";
@@ -117,23 +154,15 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         LOGGER.debug(this, `Building cache took ${this.timer.stop("building-cache")}`)
 
         // Identify potential target branches
-        const potentialTargets = await identifyPotentialTargetBranches({
-            allBranches,
-            branchToCommitCountCache: this.branchToCommitCountCache,
-            branchToLastCommitDateCache: this.branchToLastCommitDateCache,
-            protectedBranchPatterns: finalProtectedBranchPatterns,
-        });
+        const potentialTargets = await identifyPotentialTargetBranches(this, { allBranches });
 
         LOGGER.debug(this, `Potential target branches: ${potentialTargets.join(", ")}`)
 
         this.spinner.text = "Detecting branch states...";
         this.timer.start("branch-analysis");
-        const analysis = await analyzeBranches({
+        const analysis = await analyzeBranches(this, {
                 branches: candidateBranches,
-                branchToLastCommitDateCache: this.branchToLastCommitDateCache,
-                localBranchToRemoteStatuses: this.localBranchToRemoteStatuses,
                 potentialTargets,
-                staleDays: this.flags.staleDays,
             }
         );
         LOGGER.debug(this, `Branch analysis took ${this.timer.stop("branch-analysis")}`)
@@ -181,5 +210,19 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         }
 
         this.logTotalTime();
+    }
+
+    private storeFlagsIntoUserConfig() {
+        const base = this.flags.staleDays ?? 30;
+
+        this._userConfig = {
+            protectedBranchPatterns: this.flags.protectedBranches
+                ? this.flags.protectedBranches.map(pattern => new RegExp(pattern))
+                : protectedBranchPatterns,
+            staleDays: base,
+            staleDaysBehind: this.flags.staleDaysBehind ?? base,
+            staleDaysDiverged: this.flags.staleDaysDiverged ?? base * 3,
+            staleDaysLocal: this.flags.staleDaysLocal ?? base * 3
+        };
     }
 }
