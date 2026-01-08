@@ -2,9 +2,11 @@ import { Flags } from "@oclif/core";
 import chalk from "chalk";
 
 import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
+import { IssueSummary } from "../../types/IssueSummary.js";
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
+import { getBranchBackground } from "../../utils/branchBackground.js";
 import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
 import { checkIfFilesStaged } from "../../utils/checkIfFilesStaged.js";
 import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
@@ -67,9 +69,12 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start()
 
+        const branchBackground = await getBranchBackground()
+
         const initialMessages = await this.buildInitialMessages({
             examples: finalExamples,
-            instructions: finalInstructions
+            instructions: finalInstructions,
+            issue: branchBackground
         })
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -133,10 +138,12 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
 
     private async buildInitialMessages({
                                            examples,
-                                           instructions
+                                           instructions,
+                                           issue,
                                        }: {
         examples: string[],
         instructions: string,
+        issue?: IssueSummary | null
     }) {
         const git = getSimpleGit();
         const branchSummary = await git.branch();
@@ -169,8 +176,16 @@ Strict rules:
                 content: `
 User Instructions: "${instructions}"
 Current Branch: "${currentBranch}"
-${examples.length > 0 
-                    ? "Examples of Good Commit Messages: \n" + examples.join("\n") + "\n\n"
+${issue
+                    ? `
+Ticket ID: "${issue.ticketId}"
+Ticket Summary: "${issue.summary}"
+Ticket Description: "${issue.description}"
+`.trim()
+                    : ""
+                }
+${examples.length > 0
+                    ? "Examples of good commit messages: \n" + examples.join("\n") + "\n\n"
                     : ""
                 }
 `,
