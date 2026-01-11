@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
 
-import { BaseCommand } from "../../base-commands/BaseCommand.js";
+import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
 import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
@@ -23,7 +23,7 @@ import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedC
 import { withPromptExit } from "../../utils/withPromptExist.js";
 import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema/autoCommitConfig.js";
 
-export default class AutoCommitCommand extends BaseCommand<typeof AutoCommitCommand> {
+export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
         reword: Flags.string({
