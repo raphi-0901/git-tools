@@ -438,13 +438,10 @@ export const TextArea = ({ defaultValue, height = 6, onChange }: InkFormProps) =
             return;
         }
 
-        if (key.shift) {
-            if(key.delete) {
+        if (key.shift && key.delete) {
                 dispatch({ type: "DELETE_LINE" });
+                return;
             }
-
-            return;
-        }
 
         if (key.leftArrow) {
             dispatch({ type: "LEFT" });
