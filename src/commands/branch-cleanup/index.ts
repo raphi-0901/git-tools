@@ -3,7 +3,7 @@ import chalk from "chalk";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime.js";
 
-import { BaseCommand } from "../../base-commands/BaseCommand.js";
+import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
 import { analyzeBranches } from "../../utils/branchAnalyzer.js";
 import { isProtectedBranch, protectedBranchPatterns } from "../../utils/branchProtection.js";
 import { promptBranchesToDelete } from "../../utils/branchSelection.js";
@@ -17,7 +17,7 @@ import * as LOGGER from "../../utils/logging.js";
 
 dayjs.extend(relativeTime);
 
-export default class BranchCleanupCommand extends BaseCommand<typeof BranchCleanupCommand> {
+export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof BranchCleanupCommand> {
     static flags = {
         'dryRun': Flags.boolean({
             aliases: ["dry-run"],

@@ -1,7 +1,7 @@
 import { Args } from "@oclif/core";
 import chalk from "chalk";
 
-import { BaseCommand } from "../../base-commands/BaseCommand.js";
+import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
 import { getService } from "../../services/index.js";
 import { IssueSummary } from "../../types/IssueSummary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
@@ -25,7 +25,7 @@ import {
     AutoBranchUpdateConfig
 } from "../../zod-schema/autoBranchConfig.js";
 
-export default class AutoBranchCommand extends BaseCommand<typeof AutoBranchCommand> {
+export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof AutoBranchCommand> {
     static args = {
         issueUrl: Args.string({
             description: "Jira issue ID to fetch",
