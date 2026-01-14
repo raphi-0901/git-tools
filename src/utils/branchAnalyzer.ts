@@ -53,7 +53,7 @@ type AnalyzeBranchesOptions = {
  * - `stale`: Map of branch → `lastCommitDate`
  */
 export async function analyzeBranches(ctx: BranchCleanupCommand, options: AnalyzeBranchesOptions): Promise<BranchAnalysisResult> {
-    const { branchToLastCommitDateCache, localBranchToRemoteStatus, userConfig } = ctx;
+    const { localBranchToLastCommitDateCache, localBranchToRemoteStatusCache, userConfig } = ctx;
     const { branches, potentialTargets } = options;
     const { staleDays, staleDaysBehind, staleDaysDiverged, staleDaysLocal } = userConfig
     const now = Date.now();
@@ -67,11 +67,11 @@ export async function analyzeBranches(ctx: BranchCleanupCommand, options: Analyz
     };
 
     await Promise.all(branches.map(async (branch) => {
-        const lastCommitDate = branchToLastCommitDateCache.get(branch) ?? 0;
+        const lastCommitDate = localBranchToLastCommitDateCache.get(branch) ?? 0;
         const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, now);
 
         let mergedInto: string = "";
-        const { ahead, behind, hasRemote, remoteBranch } = localBranchToRemoteStatus.get(branch) ?? {
+        const { ahead, behind, hasRemote, remoteBranch } = localBranchToRemoteStatusCache.get(branch) ?? {
             ahead: 0,
             behind: 0,
             hasRemote: false,
