@@ -1,7 +1,8 @@
 # Auto Commit (`commit`)
 
 Generate clean, conventional Git commit messages automatically from your staged changes — with an interactive feedback loop when you want fine-tuning.
-
+![auto-commit-usage.gif](assets/auto-commit-usage.gif)
+![auto-branch-usage.gif](assets/auto-branch-usage.gif)
 ---
 
 ## 📦 Installation
@@ -21,7 +22,7 @@ npx git-tools auto-commit
 - 🟢 **Node.js** >= 22
 - 🧰 **Git** >= 2.30
 - 🌐 Active internet connection
-- 🔑 **Groq API key**
+- 🔑 **Groq API key** (can be generated for free [here](https://console.groq.com/keys)
 
 ---
 
