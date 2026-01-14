@@ -4,16 +4,18 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime.js";
 
 import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
+import { renderCheckboxList } from "../../ui/CheckboxList.js";
 import { analyzeBranches } from "../../utils/branchAnalyzer.js";
 import { isProtectedBranch, protectedBranchPatterns } from "../../utils/branchProtection.js";
 import { promptBranchesToDelete } from "../../utils/branchSelection.js";
 import { getBranchesSummary } from "../../utils/branchSummary.js";
-import { identifyPotentialTargetBranches } from "../../utils/branchTargetIdentification.js";
-import { getCommitCount } from "../../utils/getCommitCount.js";
 import { getLastCommitDate } from "../../utils/getLastCommitDate.js";
+import { getRemoteNames } from "../../utils/getRemoteNames.js";
 import { getRemoteStatus, RemoteStatus } from "../../utils/getRemoteStatus.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import * as LOGGER from "../../utils/logging.js";
+import { stripRemotePrefix } from "../../utils/stripRemotePrefix.js";
+import { withPromptExit } from "../../utils/withPromptExist.js";
 
 dayjs.extend(relativeTime);
 
@@ -38,6 +40,11 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             multiple: true,
             multipleNonGreedy: false,
             required: false,
+        }),
+        'skipTargetSelection': Flags.boolean({
+           aliases: ["skip-target-selection"],
+           description: 'Skip target branch selection. If set, all protected branches will be considered as potential targets.',
+           required: false,
         }),
         'staleDays': Flags.integer({
             aliases: ['stale-days'],
@@ -66,9 +73,10 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         }),
     };
     public readonly configId = "branch-cleanup";
-    private _branchToCommitCountCache = new Map<string, number>();
-    private _branchToLastCommitDateCache = new Map<string, number>();
-    private _localBranchToRemoteStatus = new Map<string, RemoteStatus>();
+    private _localBranches: Set<string> = new Set();
+    private _localBranchToLastCommitDateCache = new Map<string, number>();
+    private _localBranchToRemoteStatusCache = new Map<string, RemoteStatus>();
+    private _remoteBranches: Set<string> = new Set();
     private _userConfig: ResolvedConfig = {
         protectedBranchPatterns,
         staleDays: 30,
@@ -77,48 +85,89 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         staleDaysLocal: 90,
     }
 
-    get branchToCommitCountCache() { return this._branchToCommitCountCache; }
+    get localBranchToLastCommitDateCache() { return this._localBranchToLastCommitDateCache; }
 
-    get branchToLastCommitDateCache() { return this._branchToLastCommitDateCache; }
-
-    get localBranchToRemoteStatus() { return this._localBranchToRemoteStatus; }
+    get localBranchToRemoteStatusCache() { return this._localBranchToRemoteStatusCache; }
 
     get userConfig() { return this._userConfig; }
 
-    async buildCache(localBranches: string[], remoteBranches: string[]) {
-        const allBranches = [...localBranches, ...remoteBranches];
-
-        const allBranchPromises = allBranches.map(async (branch) => {
-            try {
-                const [lastCommitDate, commitCount] = await Promise.all([
-                    getLastCommitDate(branch),
-                    getCommitCount(branch),
-                ])
-                this._branchToLastCommitDateCache.set(branch, lastCommitDate);
-                this._branchToCommitCountCache.set(branch, commitCount);
-            } catch (error) {
-                LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
-            }
-        })
-
-        const localBranchPromises = localBranches.map(async (branch) => {
+    async buildCacheForLocalBranches(localBranches: string[]) {
+        this.timer.start("cache-build");
+        const remoteStatusPromises = localBranches.map(async (branch) => {
             try {
                 const remoteStatus = await getRemoteStatus(branch);
-                this._localBranchToRemoteStatus.set(branch, remoteStatus);
+                this._localBranchToRemoteStatusCache.set(branch, remoteStatus);
             } catch (error) {
                 LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
             }
         })
 
-        await Promise.all([
-            ...localBranchPromises,
-            ...allBranchPromises,
-        ]);
+        const lastCommitDatePromises = localBranches.map(async (branch) => {
+            try {
+                const lastCommitDate = await getLastCommitDate(branch);
+                this._localBranchToLastCommitDateCache.set(branch, lastCommitDate);
+            } catch (error) {
+                LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
+            }
+        })
+
+        await Promise.all([...remoteStatusPromises, ...lastCommitDatePromises]);
+        LOGGER.debug(this, "Cache build took " + this.timer.stop("cache-build"))
     }
 
     async catch(error: unknown) {
         super.catch(error);
         this.log(chalk.red("🚫 Branch cleanup cancelled."));
+    }
+
+    async getPotentialTargets() {
+        const remoteNames = await getRemoteNames()
+
+        const formattedRemoteBranches = [...this._remoteBranches].map(branch => {
+            const strippedBranch = stripRemotePrefix(branch, remoteNames)
+
+            return {
+                branch,
+                selected: this._userConfig.protectedBranchPatterns.some(pattern => pattern.test(strippedBranch)),
+            }
+        })
+
+        const formattedLocalBranches = [...this._localBranches].map(branch => ({
+            branch,
+            selected: this._userConfig.protectedBranchPatterns.some(pattern => pattern.test(branch)),
+        }))
+
+        if(this.flags.skipTargetSelection) {
+            return [...formattedRemoteBranches, ...formattedLocalBranches]
+                .filter(branch => branch.selected)
+                .map(branch => branch.branch)
+                .slice(0, 10)
+        }
+
+        const targetSelection = await withPromptExit(this, () => renderCheckboxList({
+                items: [
+                    { label: "Local branches", type: "separator" },
+                    ...formattedLocalBranches.map(({ branch, selected }) => ({
+                        key: branch,
+                        label: branch,
+                        selected,
+                        type: "item" as const,
+                        value: branch
+                    })),
+
+                    { label: "Remote branches", type: "separator" },
+                    ...formattedRemoteBranches.map(({ branch, selected }) => ({
+                        key: branch,
+                        label: branch,
+                        selected,
+                        type: "item" as const,
+                        value: branch
+                    })),
+                ],
+                message: "Choose potential target branches: (not more than 10 branches will be considered)",
+            }))
+
+        return targetSelection.slice(0, 10)
     }
 
     logTotalTime() {
@@ -132,39 +181,42 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
 
         const git = getSimpleGit();
 
+        // Load local and remote branches
+        this.spinner.text = "Loading branches...";
+        const { localBranches, remoteBranches } = await getBranchesSummary()
+        this._remoteBranches = new Set(remoteBranches);
+        this._localBranches = new Set(localBranches);
+        this.spinner.stop();
+
+        // parallelize fetching remote branches and building cache for last commit dates and remote status
+        const [potentialTargets] = await Promise.all([
+            this.getPotentialTargets(),
+            this.buildCacheForLocalBranches(localBranches)
+        ])
+
+        LOGGER.debug(this, `Potential target branches: ${potentialTargets.join(", ")}`)
+
         // Fetch all remotes
         this.spinner.text = "Fetching repository...";
+        this.spinner.start()
         try {
             await git.fetch(["--all"]);
         } catch {
             LOGGER.warn(this, "Error fetching repository.");
         }
 
-        // Load local and remote branches
-        this.spinner.text = "Loading branches...";
-        const { allBranches, localBranches, remoteBranches } = await getBranchesSummary()
-
-        // all locale branches which are not protected
+        // all locale branches that are not protected
         const candidateBranches = localBranches.filter(branch => !isProtectedBranch(branch, this._userConfig.protectedBranchPatterns));
-
-        // Build cache for last commit dates and importance
-        this.spinner.text = "Analyzing branch activity...";
-        this.timer.start("building-cache");
-        await this.buildCache(localBranches, remoteBranches);
-        LOGGER.debug(this, `Building cache took ${this.timer.stop("building-cache")}`)
-
-        // Identify potential target branches
-        const potentialTargets = await identifyPotentialTargetBranches(this, { allBranches });
-
-        LOGGER.debug(this, `Potential target branches: ${potentialTargets.join(", ")}`)
 
         this.spinner.text = "Detecting branch states...";
         this.timer.start("branch-analysis");
+
         const analysis = await analyzeBranches(this, {
                 branches: candidateBranches,
                 potentialTargets,
             }
         );
+
         LOGGER.debug(this, `Branch analysis took ${this.timer.stop("branch-analysis")}`)
         this.spinner.stop();
 
@@ -187,7 +239,6 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             this.spinner.start();
             for (const branch of branchesToDelete) {
                 try {
-                    // Uncomment to actually delete
                     if(this.flags.dryRun) {
                         LOGGER.log(this, `${chalk.red("✗")} Would delete branch ${branch} (dry run).`)
                     } else {
