@@ -7,7 +7,6 @@ import { renderCommitMessageInput } from "../../ui/CommitMessageInput.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { getBranchBackground } from "../../utils/branchBackground.js";
-import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
 import { checkIfFilesStaged } from "../../utils/checkIfFilesStaged.js";
 import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
@@ -20,6 +19,7 @@ import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
 import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
+import { resolveCommitHash } from "../../utils/resolveCommitHash.js";
 import { rewordCommit } from "../../utils/rewordCommitMessage.js";
 import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedCommitMessage.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
@@ -44,9 +44,10 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         this.timer.start("response");
         await checkIfInGitRepository(this);
 
+        let resolvedCommitHash: null | string = null;
         if (this.flags.reword) {
-            const commitExists = await checkIfCommitExists(this.flags.reword);
-            if (!commitExists) {
+            resolvedCommitHash = await resolveCommitHash(this.flags.reword);
+            if (!resolvedCommitHash) {
                 LOGGER.fatal(this, `Commit with hash ${this.flags.reword} does not exist.`);
             }
         } else {
@@ -85,8 +86,8 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         const tokensForDiff = remainingTokensForLLM - tokensOfInitialMessages;
         const diffAnalyzerParams: DiffAnalyzerParams = {
             remainingTokens: tokensForDiff,
-            ...(this.flags.reword
-                    ? { commitHash: this.flags.reword, type: "reword" }
+            ...(resolvedCommitHash
+                    ? { commitHash: resolvedCommitHash, type: "reword" }
                     : { type: "commit" }
             )
         };
