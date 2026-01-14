@@ -63,7 +63,7 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
                 continue
             }
 
-            const examples = []
+            const examples: string[] = []
             while(true) {
                 const example = await promptForTextConfigValue(ctx, {
                     customMessage: "Provide some examples of branch names you would like to generate: (leave empty if you don't want to provide any further examples)",

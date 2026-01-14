@@ -21,7 +21,8 @@ import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
 import {
     AutoBranchConfigSchema,
-    AutoBranchServiceConfig, AutoBranchServiceTypeValues,
+    AutoBranchServiceConfig,
+    AutoBranchServiceTypeValues,
     AutoBranchUpdateConfig
 } from "../../zod-schema/autoBranchConfig.js";
 
@@ -58,7 +59,10 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
         LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
         await isOnline(this)
-        const { groqApiKey: finalGroqApiKey, remainingTokensForLLM } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
+        const {
+            groqApiKey: finalGroqApiKey,
+            remainingTokensForLLM
+        } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
 
         this.spinner.text = "Analyzing issue for branch name generation..."
         this.spinner.start();
@@ -77,7 +81,11 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
             );
         }
 
-        const initialMessages = this.buildInitialMessages(issue, finalServiceConfigOfHostname.instructions);
+        const initialMessages = this.buildInitialMessages({
+            examples: finalServiceConfigOfHostname.examples,
+            instructions: finalServiceConfigOfHostname.instructions,
+            issue
+        });
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         const tokensOfInitialMessages = countTokens(initialMessages)
@@ -122,7 +130,15 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
         })
     }
 
-    private buildInitialMessages(issue: IssueSummary, instructions: string): ChatMessage[] {
+    private buildInitialMessages({
+                                     examples,
+                                     instructions,
+                                     issue
+                                 }: {
+        examples: string[]
+        instructions: string,
+        issue: IssueSummary,
+    }): ChatMessage[] {
         return [
             {
                 content: `
@@ -148,6 +164,9 @@ Strict rules:
             {
                 content: `
 User Instructions: "${instructions}"
+${examples.length > 0
+                    ? "Examples of good branch names: \n" + examples.join("\n") + "\n\n"
+                    : ""}
 Ticket ID: "${issue.ticketId}"
 Ticket Summary: "${issue.summary}"
 Ticket Description: "${issue.description}"
