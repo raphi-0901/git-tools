@@ -1,11 +1,18 @@
-import { getRemoteNames } from "./getRemoteNames.js";
 import { getSimpleGit } from "./getSimpleGit.js";
+import { getUpstreamBranch } from "./getUpstreamBranch.js";
 
 export type RemoteStatus = {
     ahead: number;
     behind: number;
     hasRemote: boolean;
     remoteBranch: null | string;
+};
+
+const EMPTY_REMOTE_STATUS: RemoteStatus = {
+    ahead: 0,
+    behind: 0,
+    hasRemote: false,
+    remoteBranch: null
 };
 
 /**
@@ -19,37 +26,30 @@ export type RemoteStatus = {
  *
  * @returns A promise resolving to the remote synchronization status
  */
-export async function getRemoteStatus(branch: string): Promise<RemoteStatus[]> {
+export async function getRemoteStatus(branch: string): Promise<RemoteStatus> {
     const git = getSimpleGit();
 
-    const remoteNames = await getRemoteNames()
-    const remoteBranches = remoteNames.map(remote => `${remote}/${branch}`);
+    const remoteBranch = await getUpstreamBranch(branch)
+    if(!remoteBranch) {
+        return EMPTY_REMOTE_STATUS
+    }
 
-    return Promise.all(
-        remoteBranches.map(async (remoteBranch) => {
-            try {
-                const status = await git.raw([
-                    "rev-list",
-                    "--left-right",
-                    "--count",
-                    `${branch}...${remoteBranch}`
-                ]);
+    try {
+        const status = await git.raw([
+            "rev-list",
+            "--left-right",
+            "--count",
+            `${branch}...${remoteBranch}`
+        ]);
 
-                const [ahead, behind] = status.trim().split("\t").map(Number);
-                return {
-                    ahead,
-                    behind,
-                    hasRemote: true,
-                    remoteBranch
-                };
-            } catch {
-                return {
-                    ahead: 0,
-                    behind: 0,
-                    hasRemote: false,
-                    remoteBranch: null
-                };
-            }
-        })
-    );
+        const [ahead, behind] = status.trim().split("\t").map(Number);
+        return {
+            ahead,
+            behind,
+            hasRemote: true,
+            remoteBranch
+        };
+    } catch {
+        return EMPTY_REMOTE_STATUS
+    }
 }

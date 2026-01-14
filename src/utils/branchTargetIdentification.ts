@@ -1,3 +1,4 @@
+import BranchCleanupCommand from "../commands/branch-cleanup/index.js";
 import { isProtectedBranch } from "./branchProtection.js";
 import { calculateAbsoluteDayDifference } from "./calculateAbsoluteDayDifference.js";
 import { getRemoteNames } from "./getRemoteNames.js";
@@ -6,15 +7,6 @@ import { stripRemotePrefix } from "./stripRemotePrefix.js";
 type BranchTargetIdentificationOptions = {
     /** List of all branches in the repository */
     allBranches: string[];
-
-    /** Map of branch name -> commit count */
-    branchToCommitCountCache: Map<string, number>;
-
-    /** Map of branch name -> last commit timestamp (in milliseconds) */
-    branchToLastCommitDateCache: Map<string, number>;
-
-    /** Regular expression patterns for protected branches */
-    protectedBranchPatterns: readonly RegExp[];
 };
 
 type BranchSignals = {
@@ -49,39 +41,49 @@ const NAME_RULES: Array<[RegExp, number]> = [
 ];
 
 /**
- * Identifies and ranks potential target branches in a repository
- * based on:
- * - Branch naming conventions (main, develop, release, feature, etc.)
- * - Commit history (volume and recency)
- * - Protected branch rules
+ * Identifies and ranks potential target branches in the repository.
  *
- * The returned branches are:
- * - Deduplicated by normalized name (remote prefix removed)
- * - Scored according to activity, protection, and naming rules
- * - Limited to a maximum of `SCORE.MAX_RESULTS` branches
- * - Filtered to exclude branches with a score below `SCORE.MIN_SCORE`
+ * Branches are scored using a combination of:
+ * - Naming conventions (e.g. main, develop, release, feature)
+ * - Commit volume (log-scaled)
+ * - Commit recency (days since last commit)
+ * - Protection status (derived from user configuration)
  *
- * @param {BranchTargetIdentificationOptions} options - Options for identifying target branches
- * @param {string[]} options.allBranches - All branches in the repository
- * @param {Map<string, number>} options.branchToCommitCountCache - Map of branch -> commit count
- * @param {Map<string, number>} options.branchToLastCommitDateCache - Map of branch -> last commit timestamp
- * @param {readonly RegExp[]} options.protectedBranchPatterns - Regex patterns to mark protected branches
+ * Processing behavior:
+ * - Remote prefixes are stripped to normalize branch names
+ * - Branches are deduplicated by normalized name
+ *   (keeping the highest-scoring variant)
+ * - Branches scoring below `SCORE.MIN_SCORE` are discarded
+ * - Results are sorted by score in descending order
+ * - Only the top `SCORE.MAX_RESULTS` branches are returned
  *
- * @returns {Promise<string[]>} A list of branch names, ranked from highest to lowest score
+ * @param {BranchCleanupCommand} ctx
+ * Command context providing:
+ * - Cached commit counts per branch
+ * - Cached last commit timestamps per branch
+ * - User configuration containing protected branch patterns
+ *
+ * @param {BranchTargetIdentificationOptions} options
+ * Options defining which branches are considered.
+ *
+ * @param {string[]} options.allBranches
+ * List of all branch names in the repository, including remote branches.
+ *
+ * @returns {Promise<string[]>}
+ * A list of branch names ranked from highest to lowest score.
  *
  * @example
- * const targets = await identifyPotentialTargetBranches({
- *   allBranches: ["main", "feature/login", "develop"],
- *   branchToCommitCountCache: new Map([["main", 100], ["develop", 50], ["feature/login", 5]]),
- *   branchToLastCommitDateCache: new Map([["main", 1670000000000], ["develop", 1671000000000], ["feature/login", 1672000000000]]),
- *   protectedBranchPatterns: [/^main$/, /^develop$/]
+ * const targets = await identifyPotentialTargetBranches(ctx, {
+ *   allBranches: ["origin/main", "feature/login", "develop"],
  * });
  */
 export async function identifyPotentialTargetBranches(
+    ctx: BranchCleanupCommand,
     options: BranchTargetIdentificationOptions
 ): Promise<string[]> {
-    const { allBranches, branchToCommitCountCache, branchToLastCommitDateCache, protectedBranchPatterns } = options;
-
+    const { allBranches } = options;
+    const { branchToCommitCountCache, branchToLastCommitDateCache } = ctx
+    const { protectedBranchPatterns } = ctx.userConfig
     const remoteNames = await getRemoteNames();
 
     // 1. Map branches to their scores and normalized names

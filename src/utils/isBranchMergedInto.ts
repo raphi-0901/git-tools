@@ -13,13 +13,10 @@ export async function isBranchMergedInto(
     targetBranch: string
 ): Promise<boolean> {
     const git = getSimpleGit();
+
     try {
-        const result = await git.raw([
-            "log",
-            `${targetBranch}..${sourceBranch}`,
-            "--oneline",
-        ]);
-        return result.trim() === "";
+        const mergedBranches = await git.branch(['--merged', targetBranch]);
+        return mergedBranches.all.includes(sourceBranch);
     } catch {
         return false;
     }
