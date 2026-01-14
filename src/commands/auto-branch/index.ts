@@ -6,6 +6,7 @@ import { getService } from "../../services/index.js";
 import { IssueSummary } from "../../types/IssueSummary.js";
 import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
+import { setBranchBackground } from "../../utils/branchBackground.js";
 import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
@@ -25,6 +26,22 @@ import {
     AutoBranchServiceTypeValues,
     AutoBranchUpdateConfig
 } from "../../zod-schema/autoBranchConfig.js";
+
+type BranchNameGenerationResult = {
+    branchName: string,
+    finished: true,
+    type: "accept",
+} | {
+    branchName: string,
+    finished: true,
+    type: "edit",
+} | {
+    finished: false,
+    type: "feedback",
+} | {
+    finished: true,
+    type: "cancel",
+}
 
 export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof AutoBranchCommand> {
     static args = {
@@ -93,28 +110,32 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
 
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
-        let finished = false;
-        let branchName = "";
-        while (!finished) {
+        let userDecision: BranchNameGenerationResult | null = null;
+        while (userDecision === null || !userDecision.finished) {
             this.spinner.text = "Generating branch name from issue...";
             this.spinner.start()
             try {
-                branchName = await chat.generate();
+                const branchName = await chat.generate();
+                if (!branchName) {
+                    LOGGER.fatal(this, "No branch name received from Groq API");
+                }
+
+                this.spinner.stop()
+                this.timer.start("response")
+
+                userDecision = await this.handleUserDecision(branchName, chat);
+
+                LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+                LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
+
             } catch (error) {
                 LOGGER.fatal(this, "Error while generating branch name: " + error)
             }
+        }
 
-            LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
-            LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
-
-            this.spinner.stop()
-
-            if (!branchName) {
-                LOGGER.fatal(this, "No branch name received from Groq API");
-            }
-
-            finished = await this.handleUserDecision(branchName, chat);
-            this.timer.start("response")
+        if(userDecision.type !== "cancel") {
+            // means new branch was created
+            await setBranchBackground(issue)
         }
 
         LOGGER.debug(this, `Action took ${this.timer.stop("total")}.`)
@@ -238,7 +259,7 @@ Ticket Description: "${issue.description}"
         }
     }
 
-    private async handleUserDecision(branchName: string, chat: LLMChat) {
+    private async handleUserDecision(branchName: string, chat: LLMChat): Promise<BranchNameGenerationResult> {
         const git = getSimpleGit();
         this.log(chalk.blue("\n🤖 Suggested branch name:"));
         this.log(`   ${chalk.green(branchName)}\n`);
@@ -259,12 +280,19 @@ Ticket Description: "${issue.description}"
             case "accept": {
                 await git.checkoutLocalBranch(branchName);
                 this.log(chalk.green("✅ Branch created!"));
-                return true;
+                return {
+                    branchName,
+                    finished: true,
+                    type: "accept",
+                };
             }
 
             case "cancel": {
                 this.log(chalk.red("🚫 Branch creation cancelled."));
-                return true;
+                return {
+                    finished: true,
+                    type: "cancel"
+                };
             }
 
             case "edit": {
@@ -275,7 +303,11 @@ Ticket Description: "${issue.description}"
                 await git.checkoutLocalBranch(userEdit);
                 this.log(chalk.green("✅ Branch created with custom name!"));
 
-                return true;
+                return {
+                    branchName: userEdit,
+                    finished: true,
+                    type: "edit"
+                };
             }
 
             case "feedback": {
@@ -284,7 +316,10 @@ Ticket Description: "${issue.description}"
                 }));
 
                 chat.addMessage(feedback, "user");
-                return false;
+                return {
+                    finished: false,
+                    type: "feedback"
+                }
             }
         }
     }
