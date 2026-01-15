@@ -1,0 +1,4 @@
+fix(reactivity): correct array iterator check for
+
+The array instrumentation's iterator function was checking  to determine if there were more values.
+This has been updated to check  for more accurate and robust iteration handling.
