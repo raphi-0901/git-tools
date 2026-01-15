@@ -1,0 +1,9 @@
+feat(custom-elements): batch prop updates for custom elements
+
+This commit introduces batching of prop updates for custom elements.
+Previously, prop updates could trigger multiple renders.
+By adding  and  methods, prop updates are now
+batched, ensuring that all props are updated before a single re-render
+is triggered. This improves performance and consistency for custom elements.
+
+New tests have been added to verify this behavior.

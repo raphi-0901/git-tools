@@ -1,0 +1,3 @@
+fix: add missing boolean attributes
+
+Expand support for boolean attributes such as defer, allowFullscreen, disablePictureInPicture, and disableRemotePlayback to ensure correct handling in Svelte components.
