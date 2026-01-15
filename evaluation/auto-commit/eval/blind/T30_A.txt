@@ -1,0 +1,3 @@
+refactor: simplify is_promise check
+
+The  function now uses optional chaining to simplify the check for a  method, making the code more concise.

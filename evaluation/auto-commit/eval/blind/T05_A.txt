@@ -1,0 +1,3 @@
+refactor: remove platformIsServer handling
+
+Simplify renderer constructors by dropping unused server mode flag.

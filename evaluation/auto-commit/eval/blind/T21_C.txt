@@ -1,0 +1,3 @@
+test: add sample for multiple click handlers
+
+Ensure that multiple on:click directives on the same element are correctly dispatched and counted in tests. Remove outdated non‑unique attribute event handler samples.

@@ -1,0 +1,5 @@
+fix: correctly escape message in console.error script
+
+This change ensures that the 'message' variable is properly escaped when
+being inserted into a <script> tag for console.error output, preventing
+potential syntax errors in the client-side script.

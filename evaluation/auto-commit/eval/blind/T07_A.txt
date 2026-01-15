@@ -1,0 +1,7 @@
+fix: ensure profiler events are captured during errors
+
+  Previously, if an error was thrown during change detection, component rendering, or host binding updates, the corresponding profiler "end" events would not be emitted.
+  This could lead to inaccurate profiling data and dangling start events.
+
+  This change wraps the potentially error-prone operations in try...finally blocks to guarantee that the profiler end events are always captured, even when an error
+  occurs.

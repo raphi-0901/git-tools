@@ -1,0 +1,5 @@
+feat: support input transforms in `FormUiControl`
+
+The `FormUiControl` interface now accepts `InputSignalWithTransform` for its properties. This allows form controls to use input transforms, such as `booleanAttribute` and `numberAttribute`, on the inputs that are bound to a form field's state. This improves the developer experience when creating custom form components with signals.
+
+Tests have been added to verify that the `field` directive works correctly with components that use input transforms.

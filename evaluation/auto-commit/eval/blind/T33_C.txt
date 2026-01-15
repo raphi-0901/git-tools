@@ -1,0 +1,1 @@
+feat(runtime-core): expose ErrorTypeStrings conditionally

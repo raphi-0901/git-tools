@@ -1,0 +1,3 @@
+fix: wrap iterator values only when not done
+
+Prevent wrapping a value after the iterator is completed, avoiding errors caused by processing undefined results.

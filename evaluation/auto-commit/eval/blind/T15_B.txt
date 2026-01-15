@@ -1,0 +1,3 @@
+fix: display details only when directives selected
+
+Prevent rendering empty execution details by checking for selected directives instead of entry value.

@@ -1,0 +1,3 @@
+refactor: switch to metadata API
+
+Replace deprecated aggregate metadata with the new metadata API to simplify imports, improve consistency, and remove unused code.

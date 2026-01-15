@@ -1,0 +1,3 @@
+fix: interpolate error message in client script
+
+The previous code inserted the literal `${message}` into the script, preventing the actual error text from appearing in the console and risking hydration mismatches. This change correctly embeds the message using a template literal.

@@ -1,0 +1,3 @@
+refactor: remove platformIsServer from DomRendererFactory2
+
+Removes the  property and its usage from the  and related renderer classes. This simplifies the renderer implementation by removing server-specific logic that is no longer needed in this part of the codebase.

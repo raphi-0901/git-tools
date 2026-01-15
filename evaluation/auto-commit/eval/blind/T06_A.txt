@@ -1,0 +1,3 @@
+refactor: relocate $inspect to dev module
+
+Separate $inspect implementation into its own dev module, remove legacy code from runtime, and export it from the client index for clearer organization and easier maintenance.

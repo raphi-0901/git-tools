@@ -1,0 +1,5 @@
+fix: remove invalidateJob and optimize component updates
+
+The  function and its usage in  have been removed. This mechanism was causing issues with component update scheduling, leading to potentially excessive or incorrect re-renders.
+
+New test cases have been added to  to validate that child components update only when necessary, even when triggered in multiple ways, and that earlier updates do not lead to excessive subsequent updates. The  test in  has also been removed as it is no longer relevant.

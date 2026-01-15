@@ -1,0 +1,8 @@
+feat: add name_loc to AST nodes and refactor directive interfaces
+
+This commit introduces  properties to various AST nodes in the parser output,
+providing more precise source location information for element and attribute names.
+Additionally, directive interfaces have been refactored to extend a new
+interface, improving consistency and maintainability of the AST definition.
+
+The parser snapshots have been updated to reflect these changes.
