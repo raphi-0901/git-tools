@@ -1,14 +1,19 @@
-import { runCommand } from '@oclif/test'
-import { expect } from 'chai'
+import { expect } from "chai";
 
-describe('auto-commit', () => {
-  it('runs auto-commit cmd', async () => {
-    const { stdout } = await runCommand('auto-commit')
-    expect(stdout).to.contain('hello world')
-  })
+import { createCommand, type TestShims } from "../helpers/createCommand.js";
+import { loadAutoCommitCommand } from "../helpers/loadAutoCommitCommand.js";
 
-  it('runs auto-commit --name oclif', async () => {
-    const { stdout } = await runCommand('auto-commit --name oclif')
-    expect(stdout).to.contain('hello oclif')
-  })
-})
+type AutoCommitFlags = { reword?: boolean; yes?: boolean };
+type AutoCommitInstance = TestShims<AutoCommitFlags>;
+
+describe("AutoCommitCommand", () => {
+    it("generates commit message and commits when --yes", async () => {
+        const { Command, stubs } = await loadAutoCommitCommand<AutoCommitInstance>();
+        const cmd: AutoCommitInstance = createCommand(Command, { yes: true });
+
+        await cmd.run();
+
+        expect(stubs.commitStub.calledOnce).to.equal(true);
+        expect(stubs.commitStub.firstCall.args[0]).to.equal("feat: add awesome thing");
+    });
+});
