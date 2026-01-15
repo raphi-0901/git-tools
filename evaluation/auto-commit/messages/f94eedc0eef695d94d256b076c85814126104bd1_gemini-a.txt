@@ -1,0 +1,3 @@
+fix: correctly escape error message for client-side console.error
+
+Wrap the error message in backticks to ensure it is correctly interpolated as a string literal in the client-side script, preventing syntax errors.

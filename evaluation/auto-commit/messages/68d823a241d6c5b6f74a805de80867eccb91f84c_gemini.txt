@@ -1,0 +1,4 @@
+refactor(devtools): update condition for displaying execution details
+
+The condition for displaying ng-execution-details has been updated
+to check the length of `selectedDirectives()` instead of `entry.value > 0`.

@@ -1,0 +1,3 @@
+fix: show execution details only when directives are selected
+
+The previous condition to show execution details was based on the entry value, which could be positive even if no directives were selected. This change ensures that the execution details are only shown when there are selected directives to display.

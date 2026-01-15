@@ -1,0 +1,3 @@
+fix: ensure all iterated array values are properly wrapped
+
+The previous condition 'result.value' in array iterators could prevent falsy values from being wrapped, leading to potential reactivity issues. Changing to '!result.done' ensures that every value yielded by the iterator is processed, maintaining consistent reactivity behavior for all array elements.
