@@ -1,0 +1,3 @@
+feat(runtime-core): export error message
+
+Export ErrorTypeStrings in dev or esm builds to make runtime error messages available for inspection.

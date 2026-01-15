@@ -1,0 +1,5 @@
+feat(editor): Prevent default browser save dialog with Mod-s
+
+Adds a new keybinding (Mod-s) to the code editor extensions
+to prevent the default browser save dialog from appearing
+when pressing Ctrl/Cmd + S.
