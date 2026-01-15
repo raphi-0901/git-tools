@@ -1,0 +1,8 @@
+docs(signals): improve reactive context documentation
+
+This commit enhances the documentation related to reactive contexts and signals.
+
+- Introduces a new "Reactive contexts" section in the signals overview guide.
+- Moves the "Reading without tracking dependencies" section to be part of the new reactive contexts documentation.
+- Adds cross-references to the new reactive contexts section from the inputs and queries guides.
+- Updates the `assertNotInReactiveContext` JSDoc with a `@see` link to the relevant documentation.

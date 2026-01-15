@@ -1,0 +1,9 @@
+docs(reactivity): add JSDoc for public APIs
+
+This commit adds comprehensive JSDoc comments to various public APIs within the  package,
+including , , , , and .
+These additions aim to improve code clarity and maintainability by providing detailed
+explanations, examples, and links to relevant documentation.
+
+A minor documentation fix was also applied in
+to standardize parameter descriptions.
