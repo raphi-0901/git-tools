@@ -169,6 +169,7 @@ Strict rules:
 - ALWAYS output exactly one git branch name.
 - NEVER output explanations or additional text.
 - The output must ALWAYS be a single git-safe string (lowercase, hyphens, no spaces).
+- A branch name should be a short, descriptive summary of the ticket between 3 and 8 words.
 - NEVER concatenate the previous branch name to itself or append a full duplicate.
 - When refining a branch name, ALWAYS reconstruct it cleanly based on:
   (1) the ticket information and 
