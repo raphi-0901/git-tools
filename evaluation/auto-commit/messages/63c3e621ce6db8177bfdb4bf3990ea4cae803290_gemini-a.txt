@@ -1,0 +1,3 @@
+refactor(compiler-sfc): split import usage check tests into separate file
+
+Moved the tests for `dev mode import usage check` from `compileScript.spec.ts` to a dedicated file `importUsageCheck.spec.ts` to improve organization and maintainability.
