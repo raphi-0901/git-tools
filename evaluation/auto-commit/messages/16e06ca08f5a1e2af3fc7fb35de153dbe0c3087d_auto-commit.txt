@@ -1,0 +1,3 @@
+refactor: unify scheduling and dirty tracking
+
+Introduce DirtyLevels and pause/reset scheduling utilities, replace old operation enums with constants, update computed, effect, ref, and runtime core to respect the dirty flag, enhance test coverage for computed and array edge cases, and remove the deprecated operations module.

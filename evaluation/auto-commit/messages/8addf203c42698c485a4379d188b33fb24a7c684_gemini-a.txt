@@ -1,0 +1,3 @@
+feat: add  function to Svelte compiler
+
+This introduces a new  function to the Svelte compiler, enabling the conversion of Svelte AST nodes back into Svelte source code. This functionality is crucial for tools that parse and transform Svelte components. New test cases and type definitions are included to support this feature.
