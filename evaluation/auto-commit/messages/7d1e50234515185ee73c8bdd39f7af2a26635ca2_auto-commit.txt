@@ -1,0 +1,3 @@
+feat: add InputSignalWithTransform support
+
+Allow form controls to accept transformed inputs, enabling boolean, number, and array handling via InputSignalWithTransform and adding corresponding tests.
