@@ -1,0 +1,3 @@
+docs: add imports guide and redirect functions
+
+Introduce documentation for new import APIs, remove outdated reactive map section, and redirect the old functions page to the new imports guide for clearer navigation.
