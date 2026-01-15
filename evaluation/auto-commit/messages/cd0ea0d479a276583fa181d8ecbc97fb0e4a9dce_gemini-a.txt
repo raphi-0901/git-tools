@@ -1,0 +1,3 @@
+refactor: rename HOISTED to CACHED for static vnodes
+
+The PatchFlags.HOISTED enum and related properties have been renamed to PatchFlags.CACHED to better reflect their purpose of caching static vnodes. This refactoring clarifies the terminology and aligns the codebase with the caching mechanism.
