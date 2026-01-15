@@ -1,0 +1,3 @@
+fix: prevent translation of material icons
+>
+> Adds translate="no" to elements displaying material icons to prevent automatic translation services from breaking them.
