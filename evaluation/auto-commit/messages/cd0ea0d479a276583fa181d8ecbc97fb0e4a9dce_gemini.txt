@@ -1,0 +1,5 @@
+refactor(compiler-dom, runtime-core, shared): rename PatchFlags.HOISTED to PatchFlags.CACHED
+
+This commit renames the  enum member to  across , , and  packages.
+This change improves clarity and consistency with the caching mechanism.
+Related logic in , , and  has been updated to reflect this rename.
