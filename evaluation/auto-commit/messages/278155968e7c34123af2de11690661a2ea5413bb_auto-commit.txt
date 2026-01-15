@@ -1,0 +1,3 @@
+refactor: replace destroy_signal with destroy_effect
+
+Unify destruction API across runtime and reactivity modules for consistency.

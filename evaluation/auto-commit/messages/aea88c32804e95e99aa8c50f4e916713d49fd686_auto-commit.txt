@@ -1,0 +1,3 @@
+refactor: replace scopeId helpers with setScopeId
+
+Unify scope ID handling by removing deprecated PUSH/POP/WITH helpers and introducing setScopeId. Update runtime, compiler, and SSR code to use the new helper, propagate slot scope IDs, and adjust related imports and contexts for consistent behavior.

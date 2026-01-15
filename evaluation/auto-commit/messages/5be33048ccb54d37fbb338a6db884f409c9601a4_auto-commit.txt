@@ -1,0 +1,3 @@
+refactor: reorganize validation imports under rules
+
+Move validation and rule APIs to the new `rules` namespace, update all imports and exports, and delete the obsolete `logic.ts` to improve modularity and maintainability.

@@ -1,0 +1,11 @@
+refactor: rename consumer to reaction and other internal changes
+
+This commit refactors the reactivity system to improve clarity and consistency.
+
+The main changes are:
+- Renamed  to  to better reflect its purpose.
+- Renamed signal dependencies from  to .
+- Replaced  with more specific  and  functions.
+- Renamed  to .
+- Renamed  to .
+- Introduced a  function to handle cleanup of child reactions.
