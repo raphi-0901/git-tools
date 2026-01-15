@@ -1,0 +1,9 @@
+fix(runtime-core/server-renderer): improve slotScopeIds handling for SSR and hydration
+
+This commit refactors how slotScopeIds are propagated and applied during server-side rendering and hydration.
+
+- Introduce  to  interface and various renderer/hydration function signatures.
+- Ensure  are correctly inherited and applied to elements, especially for slot content and component roots.
+- Adjust  logic to handle both  and  for proper styling in SFCs.
+- Update SSR helpers (, ) to pass and utilize  for accurate scoped style application.
+- Refactor  and  to reflect and test the new  behavior.
