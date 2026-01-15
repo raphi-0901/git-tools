@@ -1,0 +1,3 @@
+refactor: introduce rule-based architecture for signals
+
+This change refactors the signals package to use a rule-based architecture. Validation logic and other control-related metadata are now encapsulated as rules, improving modularity and extensibility. This includes moving existing validators into the new `rules/validation` directory and introducing new rules for `disabled`, `hidden`, and `readonly` states.
