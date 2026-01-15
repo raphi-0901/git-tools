@@ -1,0 +1,3 @@
+feat: add print() to compiler for AST round‑tripping
+
+Enable round‑trip testing and tooling by converting the modern AST back into valid Svelte source code.

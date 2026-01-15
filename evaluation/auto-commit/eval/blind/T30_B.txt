@@ -1,0 +1,3 @@
+refactor: simplify is_promise function
+
+Use optional chaining to make the promise check more concise and readable.

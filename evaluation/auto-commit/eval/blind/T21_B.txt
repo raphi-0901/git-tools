@@ -1,0 +1,9 @@
+feat: Add support for multiple event handlers
+
+This commit introduces the ability to define multiple event handlers for the same event on a single element. Previously, this would result in a parser error. Now, all
+specified handlers are attached and executed when the event is triggered.
+
+To support this feature, the following changes have been made:
+- The parser has been updated to allow multiple event handler attributes for the same event.
+- A new runtime test has been added to verify that all handlers are executed.
+- The old parser test that enforced the "non-unique attribute" error for event handlers has been removed.

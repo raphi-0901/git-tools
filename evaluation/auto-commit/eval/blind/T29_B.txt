@@ -1,0 +1,12 @@
+refactor(forms): unify metadata handling in signals
+
+This commit refactors the metadata handling within the forms signals package.
+
+Key changes include:
+- Renaming  to  and  to  for a more unified approach.
+- Simplifying metadata access within  by removing  and directly using .
+- Consolidating  and  into a single  for streamlined metadata definition.
+- Introducing a new test file  to cover metadata reducer functionality.
+- Updating existing tests to align with the new metadata API.
+
+These changes aim to improve consistency and simplify the API for defining and accessing metadata in forms signals.

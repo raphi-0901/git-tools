@@ -1,0 +1,1 @@
+refactor: add translate="no" to icons

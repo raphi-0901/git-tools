@@ -1,0 +1,5 @@
+fix: expand boolean attribute support
+
+Added support for several new boolean attributes including , , , , and . These attributes have been integrated into the internal , , and  lists to ensure proper handling by the Svelte compiler.
+
+New tests have also been added to verify the correct and case-insensitive behavior of these boolean attributes.

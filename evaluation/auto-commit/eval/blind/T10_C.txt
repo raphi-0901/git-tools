@@ -1,0 +1,4 @@
+feat(runtime-core): remove invalidateJob and add component update tests
+
+Removes the  function and its usages, as it's no longer needed.
+Adds new tests for child component update behavior to ensure correct rendering logic.

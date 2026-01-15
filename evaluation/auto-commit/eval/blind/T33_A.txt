@@ -1,0 +1,3 @@
+feat: expose error strings for dev/ESM builds
+
+Expose internal error type strings in development and ESM builds to aid debugging and tooling.

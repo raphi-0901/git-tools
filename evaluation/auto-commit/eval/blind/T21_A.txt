@@ -1,0 +1,6 @@
+feat: Add test for multiple event handlers
+
+Removes outdated test for non-unique attribute event handlers and
+introduces a new test case for multiple event handlers on a single node.
+This change ensures proper testing of the feature allowing multiple
+event listeners.

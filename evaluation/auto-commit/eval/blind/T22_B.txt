@@ -1,0 +1,5 @@
+fix: delegate scopeId transmission to the renderer
+
+The previous scopeId implementation was brittle and complex as it relied on manually passing scopeIds down to children. This was problematic for slots, where scopeIds could be lost or incorrectly applied.
+
+This commit refactors the scopeId implementation to delegate its transmission to the renderer. The new  property on VNodes allows the renderer to correctly propagate scopeIds to slotted content, ensuring that styles are applied correctly. This change simplifies the implementation and improves the correctness of scoped CSS for slots.

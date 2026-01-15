@@ -1,0 +1,3 @@
+refactor: improve guard name extraction, add tests
+
+Ensure guard names are correctly identified for functions, arrows, and classes, and provide UI feedback for inline functions.
