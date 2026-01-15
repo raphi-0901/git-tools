@@ -1,0 +1,3 @@
+refactor: use getCurrentInstance for inject
+
+Replace legacy instance checks with unified getCurrentInstance to ensure consistent injection context handling and remove deprecated currentRenderingInstance usage.
