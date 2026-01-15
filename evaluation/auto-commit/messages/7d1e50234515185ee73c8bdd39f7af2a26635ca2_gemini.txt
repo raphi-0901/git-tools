@@ -1,0 +1,11 @@
+feat(forms): support InputSignalWithTransform in FormUiControl
+
+This commit updates the  interface to support  for its properties.
+This allows for better integration with Angular's input transforms, providing more flexibility in how
+form control inputs are handled.
+
+The changes include:
+- Adding  to the types of various properties in  in .
+- Updating the public API golden file  to reflect these type changes.
+- Adding new test cases in  to verify the functionality with
+  for boolean, number, and custom array transforms, as well as mixed InputSignal and InputSignalWithTransform.

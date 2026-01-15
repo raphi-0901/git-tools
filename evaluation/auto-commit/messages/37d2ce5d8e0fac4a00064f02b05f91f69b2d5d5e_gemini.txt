@@ -1,0 +1,4 @@
+feat(custom-elements): improve shadowRoot: false and slot handling
+
+This commit introduces improvements for custom elements when  is set to .
+It enhances the rendering of slots in this mode and includes related test updates.

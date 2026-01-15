@@ -1,0 +1,6 @@
+feat: export MountOptions type and use it in mount function
+
+Export the MountOptions type from svelte/src/index.d.ts and svelte/types/index.d.ts
+to allow external usage and improve type clarity for the mount function.
+The mount function in svelte/src/internal/client/render.js now uses this
+exported type.

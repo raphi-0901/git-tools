@@ -1,0 +1,11 @@
+feat: support shadowRoot false in defineCustomElement
+
+This change introduces the ability to define custom elements with shadowRoot false.
+Previously, custom elements always rendered with a shadow DOM. This new option allows
+rendering custom elements directly into the light DOM, which is useful for certain
+styling and integration scenarios.
+
+The renderSlot helper has been updated to correctly handle slot content when
+shadowRoot false is enabled, ensuring that injected content replaces the
+slot element as expected. Comprehensive tests have been added to verify
+the behavior of custom elements and their slots in this mode.
