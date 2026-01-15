@@ -1,0 +1,5 @@
+feat(devtools): improve router guard name extraction and display
+
+Enhances the Angular DevTools router tree to correctly extract and display names for various guard types, including named functions, arrow functions, and class instances.
+
+Also, adds a user-friendly message when attempting to view the source of inline (arrow or anonymous) guard functions, as their source cannot be directly navigated.
