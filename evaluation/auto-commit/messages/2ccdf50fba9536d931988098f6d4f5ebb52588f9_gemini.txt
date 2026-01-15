@@ -1,0 +1,3 @@
+refactor(platform-browser): remove platformIsServer from DomRenderer
+
+The  property and its usage have been removed from  and its related renderer classes. This simplifies the client-side DOM rendering logic by decoupling it from server-side platform checks.

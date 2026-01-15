@@ -1,0 +1,7 @@
+refactor(api-inject): use getCurrentInstance() consistently
+
+This commit refactors the `inject` and `hasInjectionContext` functions
+in `runtime-core` to consistently use `getCurrentInstance()`.
+This change removes direct reliance on `currentInstance` and
+`currentRenderingInstance` for context retrieval,
+improving consistency and maintainability.

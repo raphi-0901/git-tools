@@ -1,0 +1,5 @@
+refactor: use getCurrentInstance in inject/hasInjectionContext
+
+Simplifies the logic for retrieving the current instance by using the
+newly introduced `getCurrentInstance()` helper. This avoids relying on
+direct access to `currentInstance` or `currentRenderingInstance`.
