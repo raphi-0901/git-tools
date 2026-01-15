@@ -1,0 +1,15 @@
+feat: Ensure profiler events are captured during errors
+
+Wrap change detection and rendering logic in try...finally blocks
+to guarantee that profiler end events are always emitted,
+even when errors occur during the process.
+
+This change improves the reliability of profiling data by ensuring
+that the start and end events for various operations (like change
+detection, component rendering, and host binding updates) are
+symmetrically captured, providing a more accurate representation
+of execution flow, especially in scenarios involving exceptions.
+
+Additionally, new test cases have been added to verify that profiler
+events are correctly captured when errors are thrown during component
+creation, change detection, and host binding evaluation.

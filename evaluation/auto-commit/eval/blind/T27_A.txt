@@ -1,0 +1,3 @@
+refactor: replace hoist static with cache static
+
+Switch the compiler from the old hoist‑static implementation to the new cache‑static approach, updating AST structures, helpers, transform logic, runtime flags, and related tests. This removes deprecated hoist handling, introduces array‑based caching, and aligns the codebase with the updated caching strategy for better performance and maintainability.

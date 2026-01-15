@@ -1,0 +1,4 @@
+feat: add name_loc to AST nodes
+
+  This adds the name_loc property to various AST nodes, providing location information for the name of an element or attribute. This is useful for tools that need to map
+  from the AST back to the original source code, such as for improved error reporting.

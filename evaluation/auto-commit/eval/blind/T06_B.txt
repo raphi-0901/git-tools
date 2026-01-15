@@ -1,0 +1,3 @@
+refactor: move inspect functionality to dedicated file
+
+The inspect-related functions, including 'inspect', 'inspect_fn', and 'inspect_captured_signals', have been extracted from 'runtime.js' into a new file, 'dev/inspect.js'. This improves modularity and organization of the client-side development utilities.

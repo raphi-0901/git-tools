@@ -1,0 +1,5 @@
+refactor: Rename reactivity concepts and update effect destruction
+
+Rename 'consumer' to 'reaction' and related properties (e.g., 'signal.d' to 'signal.deps', 'signal.c' to 'signal.reactions') for clarity and consistency within the reactivity system.
+Update effect destruction logic by renaming 'destroy_signal' to 'destroy_effect' and modifying its implementation.
+Adjust 'is_runes' function signature and 'update_derived' logic to align with these changes.

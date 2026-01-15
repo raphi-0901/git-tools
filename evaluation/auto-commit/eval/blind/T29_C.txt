@@ -1,0 +1,7 @@
+refactor: unify forms signals metadata handling
+
+Removes the distinction between aggregate and regular metadata. This change introduces a unified  that can define its own reduction logic, simplifying both the internal implementation and the public API.
+
+-  has been removed in favor of the enhanced .
+-  is simplified, replacing  and  with a single .
+- A new  function is introduced to better support complex metadata scenarios like resources.

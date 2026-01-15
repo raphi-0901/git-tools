@@ -1,0 +1,12 @@
+feat(devtools): add E2E tests for injector tree tab
+
+Adds Cypress E2E tests for the injector tree tab in Angular DevTools.
+This includes tests for:
+- Displaying the injector tree
+- Hiding framework injectors
+- Hiding injectors with no providers
+- Displaying providers for selected nodes
+- Filtering providers
+
+Also adds a 'provider-row' class to the injector-providers component HTML
+to facilitate testing.

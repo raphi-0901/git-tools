@@ -1,0 +1,3 @@
+feat: add e2e tests for injector tree tab
+
+Add Cypress end-to-end tests for the injector tree tab to verify its functionality, including filtering and displaying providers. Also, add 'provider-row' class for better identification in tests.
