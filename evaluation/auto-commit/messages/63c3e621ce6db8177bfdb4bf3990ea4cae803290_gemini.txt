@@ -1,0 +1,5 @@
+refactor(compiler-sfc): move import usage check tests to a separate file
+
+The tests related to dev mode import usage checks in <script setup> were moved
+from  to a new dedicated file, .
+This improves test organization and maintainability.

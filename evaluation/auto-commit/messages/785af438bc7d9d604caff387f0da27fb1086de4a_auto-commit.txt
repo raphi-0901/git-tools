@@ -1,0 +1,3 @@
+test: add e2e tests for injector tree UI
+
+Add Cypress tests to verify injector tree display, hide toggles, and provider filtering. Introduce a `provider-row` CSS class to enable reliable selector targeting in tests.
