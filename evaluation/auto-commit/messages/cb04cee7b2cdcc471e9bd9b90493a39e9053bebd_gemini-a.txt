@@ -1,0 +1,3 @@
+feat: prevent browser save dialog on `Mod-s`
+
+The default browser behavior for `Mod-s` (or `Ctrl-s`) is to open a 'Save As' dialog. In the context of the code editor, this is not the desired behavior. This change adds a keybinding to intercept this keyboard shortcut and prevent the default action, improving the user experience.
