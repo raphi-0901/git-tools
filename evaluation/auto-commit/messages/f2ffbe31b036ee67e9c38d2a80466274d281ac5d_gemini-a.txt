@@ -1,0 +1,5 @@
+feat: improve display of router guards in devtools
+
+This commit enhances the router tree in Angular DevTools to correctly display various types of guards, including named functions, arrow functions, and class-based guards.
+
+Previously, the tool did not correctly handle anonymous or arrow functions used as guards. Now, it identifies them and displays '[Function]', providing a clearer representation of the router configuration. Additionally, a user-friendly message is shown if an attempt is made to view the source of an inline function.
