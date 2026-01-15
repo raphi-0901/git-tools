@@ -1,0 +1,3 @@
+fix: batch custom element prop updates
+
+Ensure all custom element props are patched together in a single cycle to prevent watchers from firing with inconsistent states.
