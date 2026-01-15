@@ -1,0 +1,3 @@
+refactor: remove unused invalidateJob
+
+Eliminate invalidateJob and its calls to simplify the scheduler and prevent double updates. Add tests to verify child component updates occur correctly.

@@ -1,0 +1,4 @@
+feat: Refactor $inspect into its own module
+
+Moves the $inspect functionality from  to a new dedicated module .
+This improves modularity and organization of the client-side development utilities.
