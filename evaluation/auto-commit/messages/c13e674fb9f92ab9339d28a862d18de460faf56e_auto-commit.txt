@@ -1,0 +1,3 @@
+refactor: add patch batching for custom elements
+
+Add internal _beginPatch/_endPatch and dirty tracking to batch prop updates and prevent redundant renders.

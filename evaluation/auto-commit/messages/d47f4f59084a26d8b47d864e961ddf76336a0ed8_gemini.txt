@@ -1,0 +1,4 @@
+feat: Expand boolean attribute support and add test case
+
+This commit expands the list of supported boolean attributes in Svelte to include , , and .
+A new test case has been added to ensure case-insensitivity for these attributes.
