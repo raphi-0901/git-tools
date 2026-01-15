@@ -1,0 +1,21 @@
+refactor: rewrite effect implementation for performance and memory efficiency
+
+This commit introduces a complete rewrite of the internal effect
+implementation.
+
+The new implementation is simpler, more efficient, and more memory-friendly.
+It also fixes a number of long-standing edge case bugs related to scheduler
+timing and dependency tracking.
+
+The new implementation is based on a new  class that
+encapsulates the logic for tracking dependencies and running effects.
+This makes the code easier to understand and maintain.
+
+The old  file has been removed, and the logic for tracking
+dependencies has been moved into the  class.
+
+The  and  implementations have been updated to
+use the new  class.
+
+The changes in this commit should not affect the public API of the
+reactivity system.

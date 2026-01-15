@@ -1,0 +1,9 @@
+feat: Add  function to Svelte compiler and update related files
+
+This commit introduces a new  function to the Svelte compiler, allowing for the conversion of a Svelte AST node back into Svelte source code.
+
+Changes include:
+- Addition of new test cases for the  function in .
+- Updates to  to include type definitions for the  function and .
+- Integration of the  function into  for testing purposes.
+- Dependency updates in  for  and  packages.
