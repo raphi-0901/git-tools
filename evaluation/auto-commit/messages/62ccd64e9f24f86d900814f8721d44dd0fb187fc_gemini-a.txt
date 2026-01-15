@@ -1,0 +1,3 @@
+docs: add documentation for reactive contexts
+
+This commit introduces a new section on reactive contexts to the signals documentation. This new section explains what a reactive context is, and how to both assert that code is not executing within one and how to read signals without tracking dependencies. The guides for component inputs and queries are also updated to link to this new section for better discoverability.

@@ -1,0 +1,6 @@
+docs: Refactor API documentation for functions into imports
+
+- Moved 'Reactive Map, Set and Date' documentation from runes.md to imports.md.
+- Renamed and refactored 'Functions' documentation into 'Imports' to better reflect the content.
+- Added documentation for  and  from .
+- Implemented a redirect from /docs/functions to /docs/imports.

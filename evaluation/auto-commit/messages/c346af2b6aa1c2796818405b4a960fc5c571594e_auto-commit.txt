@@ -1,0 +1,3 @@
+docs: add JSDoc comments to reactivity APIs
+
+Provide detailed documentation for reactive utilities and functions to clarify their purpose, usage, and behavior, improving developer experience and maintainability. Also update param comment in templateUtils for consistency.
