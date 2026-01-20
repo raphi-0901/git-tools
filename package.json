@@ -16,7 +16,6 @@
     "@rwirnsberger/ink-text-input": "^1.0.0",
     "@rwirnsberger/ink-titled-box": "^1.0.1",
     "chalk": "^5.6.2",
-    "cli-table3": "^0.6.5",
     "dayjs": "^1.11.18",
     "deepmerge-ts": "^7.1.5",
     "fs-extra": "^11.3.2",
