@@ -63,7 +63,15 @@ export default class DivergenceBranchesCommand extends BaseCommand<typeof Diverg
         const git = getSimpleGit();
 
         // Get all remote branches
-        const remoteBranches = (await git.branch(["-r"])).all;
+        const remoteBranches = (await git.raw([
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname:short)",
+            "refs/remotes",
+        ]))
+            .split("\n")
+            .filter(Boolean);
+
         const remoteNames = await getRemoteNames();
 
         if (remoteNames.length === 0) {
