@@ -1,8 +1,6 @@
 import { IssueSummary, IssueSummarySchema } from "../types/IssueSummary.js";
 import { getSimpleGit } from "./getSimpleGit.js";
 
-
-
 export async function getBranchBackground() {
     const git = getSimpleGit();
 
