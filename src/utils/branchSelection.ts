@@ -60,14 +60,14 @@ export async function promptBranchesToDelete(
     analysis: BranchAnalysisResult,
     autoConfirm: boolean,
 ): Promise<string[]> {
-    const { behindOnly, diverged, localOnly, merged, stale } = analysis;
+    const { abandoned, behindOnly, diverged, merged, stale } = analysis;
 
     if (autoConfirm) {
         return [
             ...merged.keys(),
             ...behindOnly.keys(),
             ...diverged.keys(),
-            ...localOnly.keys(),
+            ...abandoned.keys(),
             ...stale.keys()
         ];
     }
@@ -103,10 +103,10 @@ export async function promptBranchesToDelete(
             type: "diverged",
         },
         {
-            branches: localOnly,
+            branches: abandoned,
             formatLabel: (branch, lastCommitDate) =>
                 `${chalk.magenta(branch)} ${chalk.dim(`(Local only, active: ${dayjs(lastCommitDate).fromNow()})`)}`,
-            label: `Stale Local branches (>${staleDaysLocal} days) without remote counterpart (${localOnly.size})`,
+            label: `Stale Local branches (>${staleDaysLocal} days) without remote counterpart (${abandoned.size})`,
             message: "Local and abandoned branches to delete:",
             type: "localOnly",
         },
