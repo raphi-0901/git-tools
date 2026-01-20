@@ -8,7 +8,7 @@ import * as LOGGER from "./logging.js";
  * Resets the current Git branch to the most recent commit
  * whose commit date is **before** the given timestamp.
  *
- * Iterates through the commit history (newest → oldest) and performs
+ * Iterates through the commit history (newest -> oldest) and performs
  * a hard reset (`git reset --hard <hash>`) on the first commit found
  * that is at least as old as `commitBefore`.
  *

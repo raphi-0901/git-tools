@@ -46,11 +46,11 @@ type AnalyzeBranchesOptions = {
  * @param options.potentialTargets - Branches considered as merge targets
  *
  * @returns A promise resolving to a {@link BranchAnalysisResult} containing categorized branches:
- * - `merged`: Map of branch → `{ lastCommitDate, mergedInto }`
- * - `localOnly`: Map of branch → `lastCommitDate`
- * - `diverged`: Map of branch → `{ ahead, behind, lastCommitDate }`
- * - `behindOnly`: Map of branch → `{ behind, lastCommitDate }`
- * - `stale`: Map of branch → `lastCommitDate`
+ * - `merged`: Map of branch -> `{ lastCommitDate, mergedInto }`
+ * - `localOnly`: Map of branch -> `lastCommitDate`
+ * - `diverged`: Map of branch -> `{ ahead, behind, lastCommitDate }`
+ * - `behindOnly`: Map of branch -> `{ behind, lastCommitDate }`
+ * - `stale`: Map of branch -> `lastCommitDate`
  */
 export async function analyzeBranches(ctx: BranchCleanupCommand, options: AnalyzeBranchesOptions): Promise<BranchAnalysisResult> {
     const { localBranchToLastCommitDateCache, localBranchToRemoteStatusCache, userConfig } = ctx;
