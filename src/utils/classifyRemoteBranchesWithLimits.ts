@@ -98,13 +98,7 @@ export async function classifyRemoteBranchesWithLimits(
         }
 
         // gets modified, so no isAlreadyMerged check needed
-        if(ageInDays >= 90 && sets.behindOnly.size < finalLimits.behindOnly) {
-            sets.behindOnly.add(branch);
-            continue;
-        }
-
-        // gets modified, so no isAlreadyMerged check needed
-        if (ageInDays >= 30 &&sets.experiments.size < finalLimits.experiments) {
+        if (ageInDays >= 90 &&sets.experiments.size < finalLimits.experiments) {
             sets.experiments.add(branch);
             continue;
         }
