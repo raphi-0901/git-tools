@@ -8,6 +8,7 @@ type BranchSets = {
     abandoned: Set<string>;
     behindOnly: Set<string>
     experiments: Set<string>;
+    merged: Set<string>;
     pendingPush: Set<string>;
     synchronizedNeeded: Set<string>;
     synchronizedOld: Set<string>;
@@ -17,6 +18,7 @@ type LimitConfig = {
     abandoned: number;
     behindOnly: number;
     experiments: number;
+    merged: number;
     pendingPush: number;
     synchronizedNeeded: number;
     synchronizedOld: number;
@@ -38,6 +40,7 @@ export async function classifyRemoteBranchesWithLimits(
         abandoned: 10,
         behindOnly: 10,
         experiments: 10,
+        merged: 10,
         pendingPush: 5,
         synchronizedNeeded: 5,
         synchronizedOld: 10,
@@ -47,6 +50,7 @@ export async function classifyRemoteBranchesWithLimits(
         abandoned: new Set(),
         behindOnly: new Set(),
         experiments: new Set(),
+        merged: new Set,
         pendingPush: new Set(),
         synchronizedNeeded: new Set(),
         synchronizedOld: new Set(),
@@ -60,6 +64,7 @@ export async function classifyRemoteBranchesWithLimits(
             sets.synchronizedOld.size >= finalLimits.synchronizedOld &&
             sets.synchronizedNeeded.size >= finalLimits.synchronizedNeeded &&
             sets.pendingPush.size >= finalLimits.pendingPush &&
+            sets.merged.size >= finalLimits.merged &&
             sets.behindOnly.size >= finalLimits.behindOnly
         ) {
             break;
@@ -71,6 +76,11 @@ export async function classifyRemoteBranchesWithLimits(
         const ageInDays = calculateAbsoluteDayDifference(lastCommitDate, new Date());
 
         // ---- PRIORITY ORDER (FIRST MATCH WINS) ----
+        if(!isAlreadyMerged && ageInDays >= 90 && sets.behindOnly.size < finalLimits.behindOnly) {
+            sets.behindOnly.add(branch);
+            continue;
+        }
+
         if (!isAlreadyMerged && ageInDays >= 90 && sets.synchronizedOld.size < finalLimits.synchronizedOld) {
             sets.synchronizedOld.add(branch);
             continue;
@@ -102,12 +112,19 @@ export async function classifyRemoteBranchesWithLimits(
         // gets modified, so no isAlreadyMerged check needed
         if(sets.pendingPush.size < finalLimits.pendingPush) {
             sets.pendingPush.add(branch);
+            continue;
+        }
+
+        // just random names
+        if(sets.merged.size < finalLimits.merged) {
+            sets.merged.add(branch);
         }
 
         // otherwise: branch is intentionally ignored
     }
 
     LOGGER.log(ctx, `Classifying Statistics:`);
+    LOGGER.log(ctx, `Merged: ${sets.merged.size} of ${finalLimits.merged}`);
     LOGGER.log(ctx, `Abandoned: ${sets.abandoned.size} of ${finalLimits.abandoned}`);
     LOGGER.log(ctx, `Behind Only: ${sets.behindOnly.size} of ${finalLimits.behindOnly}`);
     LOGGER.log(ctx, `Experiments: ${sets.experiments.size} of ${finalLimits.experiments}`);

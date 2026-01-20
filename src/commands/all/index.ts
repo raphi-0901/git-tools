@@ -109,11 +109,11 @@ export default class DivergenceBranchesCommand extends BaseCommand<typeof Diverg
         })
 
         // this.spinner.text = "Creating local branches which get merged into main..."
-        for (let i = 0; i < 10; i++) {
-            const localBranchName = `feature/${i}-git-tools-evaluation`;
+        for (const branch of classifiedRemoteBranches.merged) {
+            const localBranchName = stripRemotePrefix(branch, remoteNames) + "-mg"
 
             await git.checkout(["-b", localBranchName, branchConsideredMain]);
-            await this.createCommit(`feat: add README-${i}.md`);
+            await this.createCommit(`feat: add README.md for branch ${localBranchName}`);
             await git.checkout(branchConsideredMain);
 
             await git.merge(["--no-edit", localBranchName]);
