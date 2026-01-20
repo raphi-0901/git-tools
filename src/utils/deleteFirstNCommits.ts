@@ -27,12 +27,5 @@ export async function deleteFirstNCommits(
     );
 
     // Determine new root commit (skip first N commits)
-    const commits = (
-        await git.raw(["rev-list", "--reverse", "HEAD"])
-    )
-        .trim()
-        .split("\n");
-
-    const newRoot = commits[commitsToDelete];
-    await git.reset(["--hard", newRoot]);
+    await git.reset(["--hard", `HEAD~${commitsToDelete}`]);
 }

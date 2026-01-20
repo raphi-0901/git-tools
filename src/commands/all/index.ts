@@ -161,7 +161,9 @@ export default class DivergenceBranchesCommand extends BaseCommand<typeof Diverg
         for (const branch of classifiedRemoteBranches.behindOnly) {
             const localBranchName = stripRemotePrefix(branch, remoteNames) + "-beho"
             await git.checkout(["-b", localBranchName, branch]);
-            await deleteFirstNCommits(this, Math.floor(Math.random() * 150))
+
+            const deleteCount = Math.ceil(Math.random() * 4)
+            await deleteFirstNCommits(this, deleteCount)
             this.logBranchCreated(localBranchName)
         }
 
