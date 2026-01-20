@@ -40,7 +40,7 @@ export default class DivergenceBranchesCommand extends BaseCommand<typeof Diverg
         writeFileSync(`README-${Math.random()}.md`, '');
 
         await git.add('.');
-        if(date) {
+        if (date) {
             await git.env({
                 GIT_AUTHOR_DATE: date.toISOString(),
                 GIT_AUTHOR_EMAIL: "git-tools-evaluation@email.com",
@@ -96,7 +96,7 @@ export default class DivergenceBranchesCommand extends BaseCommand<typeof Diverg
             }
 
             const upstreamOfMain = await getUpstreamBranch(branchConsideredMain)
-            if(upstreamOfMain) {
+            if (upstreamOfMain) {
                 await git.reset(['--hard', upstreamOfMain])
             }
 
