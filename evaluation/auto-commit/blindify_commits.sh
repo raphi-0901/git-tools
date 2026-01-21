@@ -20,8 +20,8 @@ mkdir -p "$BLIND_DIR" "$OUT_DIR"
 
 export RANDOM=$SEED
 
-echo "test_id,label,system,source_file" > "$KEY_FILE"
-echo "test_id,label,what,why,format,type,overall" > "$RATINGS_FILE"
+echo "test_id,hash,label,system,source_file" > "$KEY_FILE"
+echo "test_id,hash,label,what,why,format,type,overall" > "$RATINGS_FILE"
 
 test_idx=1
 
@@ -68,10 +68,10 @@ for hash in "${commit_hashes[@]}"; do
     dst="$BLIND_DIR/${test_id}_${labels[i]}.txt"
     cp "${files[i]}" "$dst"
 
-    echo "$test_id,${labels[i]},${systems[i]},$(basename "${files[i]}")" \
+    echo "$test_id,${hash},${labels[i]},${systems[i]},$(basename "${files[i]}")" \
       >> "$KEY_FILE"
 
-    echo "$test_id,${labels[i]},,,,," >> "$RATINGS_FILE"
+    echo "$test_id,${hash},${labels[i]},,,,," >> "$RATINGS_FILE"
   done
 
   test_idx=$((test_idx + 1))
