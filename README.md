@@ -20,7 +20,7 @@ $ npm install -g @rwirnsberger/git-tools
 $ git-tools COMMAND
 running command...
 $ git-tools (--version)
-@rwirnsberger/git-tools/1.4.0 linux-x64 node-v22.21.1
+@rwirnsberger/git-tools/1.5.0 linux-x64 node-v22.21.1
 $ git-tools --help [COMMAND]
 USAGE
   $ git-tools COMMAND
@@ -29,13 +29,29 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
+* [`git-tools all`](#git-tools-all)
 * [`git-tools auto-branch ISSUEURL`](#git-tools-auto-branch-issueurl)
 * [`git-tools auto-branch config`](#git-tools-auto-branch-config)
 * [`git-tools auto-commit`](#git-tools-auto-commit)
 * [`git-tools auto-commit config`](#git-tools-auto-commit-config)
 * [`git-tools branch-cleanup`](#git-tools-branch-cleanup)
-* [`git-tools checkout-all-remote-branches`](#git-tools-checkout-all-remote-branches)
-* [`git-tools diverge-branches`](#git-tools-diverge-branches)
+
+## `git-tools all`
+
+Diverges every 5th branch
+
+```
+USAGE
+  $ git-tools all [--cleanBefore]
+
+FLAGS
+  --cleanBefore  Cleans up all local branches except main before starting and resets main to be synced with remote.
+
+DESCRIPTION
+  Diverges every 5th branch
+```
+
+_See code: [src/commands/all/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/all/index.ts)_
 
 ## `git-tools auto-branch ISSUEURL`
 
@@ -56,7 +72,7 @@ DESCRIPTION
   Generate Git branch names from Jira tickets with AI suggestions and interactive feedback
 ```
 
-_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/auto-branch/index.ts)_
+_See code: [src/commands/auto-branch/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/auto-branch/index.ts)_
 
 ## `git-tools auto-branch config`
 
@@ -70,7 +86,7 @@ DESCRIPTION
   Opens up the configuration for the auto-branch command.
 ```
 
-_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/auto-branch/config.ts)_
+_See code: [src/commands/auto-branch/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/auto-branch/config.ts)_
 
 ## `git-tools auto-commit`
 
@@ -89,7 +105,7 @@ DESCRIPTION
   Automatically generate commit messages from staged files with feedback loop
 ```
 
-_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/auto-commit/index.ts)_
+_See code: [src/commands/auto-commit/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/auto-commit/index.ts)_
 
 ## `git-tools auto-commit config`
 
@@ -103,7 +119,7 @@ DESCRIPTION
   Opens up the configuration for the auto-commit command.
 ```
 
-_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/auto-commit/config.ts)_
+_See code: [src/commands/auto-commit/config.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/auto-commit/config.ts)_
 
 ## `git-tools branch-cleanup`
 
@@ -127,33 +143,5 @@ FLAGS
       --staleDaysLocal=<value>        Number of days for local-only branches (default: staleDays × 3)
 ```
 
-_See code: [src/commands/branch-cleanup/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/branch-cleanup/index.ts)_
-
-## `git-tools checkout-all-remote-branches`
-
-Checks out all remote branches locally
-
-```
-USAGE
-  $ git-tools checkout-all-remote-branches
-
-DESCRIPTION
-  Checks out all remote branches locally
-```
-
-_See code: [src/commands/checkout-all-remote-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/checkout-all-remote-branches/index.ts)_
-
-## `git-tools diverge-branches`
-
-Diverges every 5th branch
-
-```
-USAGE
-  $ git-tools diverge-branches
-
-DESCRIPTION
-  Diverges every 5th branch
-```
-
-_See code: [src/commands/diverge-branches/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.4.0/src/commands/diverge-branches/index.ts)_
+_See code: [src/commands/branch-cleanup/index.ts](https://github.com/raphi-0901/git-tools/blob/v1.5.0/src/commands/branch-cleanup/index.ts)_
 <!-- commandsstop -->
