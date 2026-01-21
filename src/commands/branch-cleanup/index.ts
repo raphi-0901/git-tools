@@ -2,18 +2,19 @@ import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime.js";
+import { simpleGit } from "simple-git";
 
 import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
+import { RemoteStatus } from "../../types/RemoteStatus.js";
 import { renderCheckboxList } from "../../ui/CheckboxList.js";
 import { analyzeBranches } from "../../utils/branchAnalyzer.js";
 import { isProtectedBranch, protectedBranchPatterns } from "../../utils/branchProtection.js";
 import { promptBranchesToDelete } from "../../utils/branchSelection.js";
 import { getBranchesSummary } from "../../utils/branchSummary.js";
-import { getLastCommitDate } from "../../utils/getLastCommitDate.js";
 import { getRemoteNames } from "../../utils/getRemoteNames.js";
-import { getRemoteStatus, RemoteStatus } from "../../utils/getRemoteStatus.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import * as LOGGER from "../../utils/logging.js";
+import { parseUpstreamTrackLong } from "../../utils/parseUpstreamTrackLine.js";
 import { stripRemotePrefix } from "../../utils/stripRemotePrefix.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
 
@@ -91,27 +92,45 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
 
     get userConfig() { return this._userConfig; }
 
-    async buildCacheForLocalBranches(localBranches: string[]) {
+    async buildCacheForLocalBranches() {
         this.timer.start("cache-build");
-        const remoteStatusPromises = localBranches.map(async (branch) => {
-            try {
-                const remoteStatus = await getRemoteStatus(branch);
-                this._localBranchToRemoteStatusCache.set(branch, remoteStatus);
-            } catch (error) {
-                LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
-            }
-        })
+        const git = simpleGit();
 
-        const lastCommitDatePromises = localBranches.map(async (branch) => {
-            try {
-                const lastCommitDate = await getLastCommitDate(branch);
-                this._localBranchToLastCommitDateCache.set(branch, lastCommitDate);
-            } catch (error) {
-                LOGGER.debug(this, `Error getting infos for ${branch}: ${error}`);
-            }
-        })
+        const format =
+            '%(refname:short)|%(if)%(upstream:short)%(then)%(upstream:short)%(else)%(end)|%(committerdate:unix)|%(upstream:track)';
 
-        await Promise.all([...remoteStatusPromises, ...lastCommitDatePromises]);
+        const lines = (await git.raw([
+            'for-each-ref',
+            `--format=${format}`,
+            'refs/heads',
+        ])).split("\n");
+
+        for (const line of lines) {
+            if (!line.trim()) {
+                continue;
+            }
+
+            const [branchName, remoteBranchName, commitDate, track] = line.split("|")
+            this._localBranchToLastCommitDateCache.set(branchName, Number.parseInt(commitDate, 10) * 1000);
+
+            if(!remoteBranchName) {
+                this._localBranchToRemoteStatusCache.set(branchName, {
+                    type: "no-remote"
+                });
+                continue;
+            }
+
+            const trackingStatus = parseUpstreamTrackLong(track)
+            if(!trackingStatus) {
+                continue;
+            }
+
+            this._localBranchToRemoteStatusCache.set(branchName, {
+                ...trackingStatus,
+                remoteBranch: remoteBranchName
+            })
+        }
+
         LOGGER.debug(this, "Cache build took " + this.timer.stop("cache-build"))
     }
 
@@ -191,7 +210,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         // parallelize fetching remote branches and building cache for last commit dates and remote status
         const [potentialTargets] = await Promise.all([
             this.getPotentialTargets(),
-            this.buildCacheForLocalBranches(localBranches)
+            this.buildCacheForLocalBranches()
         ])
 
         LOGGER.debug(this, `Potential target branches: ${potentialTargets.join(", ")}`)
@@ -225,7 +244,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             analysis.merged.size === 0 &&
             analysis.stale.size === 0 &&
             analysis.behindOnly.size === 0 &&
-            analysis.localOnly.size === 0 &&
+            analysis.abandoned.size === 0 &&
             analysis.diverged.size === 0
         ) {
             LOGGER.log(this, "✅ No cleanup candidates found.");

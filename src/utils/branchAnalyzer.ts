@@ -6,9 +6,9 @@ import { calculateAbsoluteDayDifference } from "./calculateAbsoluteDayDifference
 import { isBranchMergedInto } from "./isBranchMergedInto.js";
 
 export type BranchAnalysisResult = {
+    abandoned: Map<string, number>;
     behindOnly: Map<string, BehindInfo>;
     diverged: Map<string, DivergedInfo>;
-    localOnly: Map<string, number>;
     merged: Map<string, MergeInfo>;
     stale: Map<string, number>;
 };
@@ -59,31 +59,49 @@ export async function analyzeBranches(ctx: BranchCleanupCommand, options: Analyz
     const now = Date.now();
 
     const result: BranchAnalysisResult = {
+        abandoned: new Map(),
         behindOnly: new Map(),
         diverged: new Map(),
-        localOnly: new Map(),
         merged: new Map(),
         stale: new Map(),
     };
 
     await Promise.all(branches.map(async (branch) => {
-        const lastCommitDate = localBranchToLastCommitDateCache.get(branch) ?? 0;
+        const lastCommitDate = localBranchToLastCommitDateCache.get(branch) ?? now;
         const daysSinceLastCommit = calculateAbsoluteDayDifference(lastCommitDate, now);
 
-        let mergedInto: string = "";
-        const { ahead, behind, hasRemote, remoteBranch } = localBranchToRemoteStatusCache.get(branch) ?? {
-            ahead: 0,
-            behind: 0,
-            hasRemote: false,
-            remoteBranch: null
-        };
+        const remoteStatus = localBranchToRemoteStatusCache.get(branch)
+        if(!remoteStatus) {
+            return;
+        }
 
+        if (remoteStatus.type === "no-remote" && daysSinceLastCommit > staleDaysLocal) {
+            result.abandoned.set(branch, lastCommitDate);
+            return;
+        }
+
+        if (remoteStatus.type === "diverged" && daysSinceLastCommit > staleDaysDiverged) {
+            result.diverged.set(branch, { ahead: remoteStatus.ahead, behind: remoteStatus.behind, lastCommitDate });
+            return;
+        }
+
+        if (remoteStatus.type === "behind" && daysSinceLastCommit > staleDaysBehind) {
+            result.behindOnly.set(branch, { behind: remoteStatus.behind, lastCommitDate });
+            return;
+        }
+
+        if (remoteStatus.type === "synced" && daysSinceLastCommit > staleDays) {
+            result.stale.set(branch, lastCommitDate);
+            return;
+        }
+
+        let mergedInto: string = "";
         for (const target of potentialTargets) {
             if (target === branch) {
                 continue;
             }
 
-            if (remoteBranch === target) {
+            if (remoteStatus.type !== "no-remote" && remoteStatus.remoteBranch === target) {
                 continue;
             }
 
@@ -98,26 +116,6 @@ export async function analyzeBranches(ctx: BranchCleanupCommand, options: Analyz
                 lastCommitDate,
                 mergedInto,
             });
-            return;
-        }
-
-        if (!hasRemote && daysSinceLastCommit > staleDaysLocal) {
-            result.localOnly.set(branch, lastCommitDate);
-            return;
-        }
-
-        if (ahead > 0 && behind > 0 && daysSinceLastCommit > staleDaysDiverged) {
-            result.diverged.set(branch, { ahead, behind, lastCommitDate });
-            return;
-        }
-
-        if (behind > 0 && ahead === 0 && daysSinceLastCommit > staleDaysBehind) {
-            result.behindOnly.set(branch, { behind, lastCommitDate });
-            return;
-        }
-
-        if (ahead === 0 && behind === 0 && daysSinceLastCommit > staleDays) {
-            result.stale.set(branch, lastCommitDate);
         }
     }));
 
