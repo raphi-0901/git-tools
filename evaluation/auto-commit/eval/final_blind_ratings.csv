@@ -1,0 +1,100 @@
+﻿test_id;hash;label;what;why;format;type;overall
+T01;16e06ca08f5a1e2af3fc7fb35de153dbe0c3087d;A;y;n;y;y;
+T01;16e06ca08f5a1e2af3fc7fb35de153dbe0c3087d;B;y;n;n;y;
+T01;16e06ca08f5a1e2af3fc7fb35de153dbe0c3087d;C;n;n;y;y;has missing words
+T02;1a341a25f0d2dfd7961a677dce873090b057eeec;A;n;n;n;y;has missing words & starts with capital letter after type like docs: Rename
+T02;1a341a25f0d2dfd7961a677dce873090b057eeec;B;y;y;y;y;
+T02;1a341a25f0d2dfd7961a677dce873090b057eeec;C;n;n;y;y;has error message in commit message
+T03;2078f8b7565cf637f47fcd5b0abdfb2b264225bb;A;y;y;y;y;
+T03;2078f8b7565cf637f47fcd5b0abdfb2b264225bb;B;y;y;y;y;
+T03;2078f8b7565cf637f47fcd5b0abdfb2b264225bb;C;n;n;y;y;has missing words
+T04;278155968e7c34123af2de11690661a2ea5413bb;A;y;n;n;y;starts with capital letter after type
+T04;278155968e7c34123af2de11690661a2ea5413bb;B;n;n;y;y;has missing words
+T04;278155968e7c34123af2de11690661a2ea5413bb;C;y;n;y;y;
+T05;2ccdf50fba9536d931988098f6d4f5ebb52588f9;A;y;y;y;y;
+T05;2ccdf50fba9536d931988098f6d4f5ebb52588f9;B;n;n;y;y;has missing words
+T05;2ccdf50fba9536d931988098f6d4f5ebb52588f9;C;n;n;n;y;has missing words & has scope type
+T06;307f15d5f78e246de6523a71f0869e32e6b86a37;A;y;n;y;y;
+T06;307f15d5f78e246de6523a71f0869e32e6b86a37;B;y;y;y;y;
+T06;307f15d5f78e246de6523a71f0869e32e6b86a37;C;n;n;n;n;has missing words & starts with capital letter after type like docs: Rename
+T07;3760045e3e571a736b6898c9cf4951f440f187d9;A;y;y;y;y;
+T07;3760045e3e571a736b6898c9cf4951f440f187d9;B;y;y;y;n;very long
+T07;3760045e3e571a736b6898c9cf4951f440f187d9;C;y;n;y;n;
+T08;37d2ce5d8e0fac4a00064f02b05f91f69b2d5d5e;A;y;y;y;y;
+T08;37d2ce5d8e0fac4a00064f02b05f91f69b2d5d5e;B;n;n;n;y;has missing words
+T08;37d2ce5d8e0fac4a00064f02b05f91f69b2d5d5e;C;y;y;y;y;very long
+T09;42c05650ff1d9e3f41164578578de63bad813f12;A;y;y;n;y;has > chars in the message
+T09;42c05650ff1d9e3f41164578578de63bad813f12;B;y;n;y;n;
+T09;42c05650ff1d9e3f41164578578de63bad813f12;C;n;n;n;n;no message received
+T10;4b608a9449fcfaa9c6105c96573ed30b599d2800;A;n;n;y;y;has missing words
+T10;4b608a9449fcfaa9c6105c96573ed30b599d2800;B;y;y;y;n;
+T10;4b608a9449fcfaa9c6105c96573ed30b599d2800;C;n;n;n;n;has missing words & has scope type
+T11;5be33048ccb54d37fbb338a6db884f409c9601a4;A;y;y;y;y;
+T11;5be33048ccb54d37fbb338a6db884f409c9601a4;B;y;y;y;y;
+T11;5be33048ccb54d37fbb338a6db884f409c9601a4;C;n;n;n;y;has missing words & has scope type
+T12;617e179e684363a03af6707a8d94f92e2510f523;A;y;n;y;y;
+T12;617e179e684363a03af6707a8d94f92e2510f523;B;n;n;y;n;
+T12;617e179e684363a03af6707a8d94f92e2510f523;C;n;n;n;n;has missing words
+T13;62ccd64e9f24f86d900814f8721d44dd0fb187fc;A;y;y;n;y;scope type
+T13;62ccd64e9f24f86d900814f8721d44dd0fb187fc;B;y;n;y;y;
+T13;62ccd64e9f24f86d900814f8721d44dd0fb187fc;C;y;y;y;y;
+T14;63c3e621ce6db8177bfdb4bf3990ea4cae803290;A;y;y;n;y;
+T14;63c3e621ce6db8177bfdb4bf3990ea4cae803290;B;n;n;y;y;
+T14;63c3e621ce6db8177bfdb4bf3990ea4cae803290;C;n;n;n;y;has missing words & has scope type
+T15;68d823a241d6c5b6f74a805de80867eccb91f84c;A;y;y;n;n;scope type
+T15;68d823a241d6c5b6f74a805de80867eccb91f84c;B;y;y;y;y;
+T15;68d823a241d6c5b6f74a805de80867eccb91f84c;C;y;y;y;y;
+T16;785af438bc7d9d604caff387f0da27fb1086de4a;A;y;y;n;n;scope type
+T16;785af438bc7d9d604caff387f0da27fb1086de4a;B;y;y;y;n;
+T16;785af438bc7d9d604caff387f0da27fb1086de4a;C;y;y;y;y;
+T17;7d1e50234515185ee73c8bdd39f7af2a26635ca2;A;y;y;y;y;
+T17;7d1e50234515185ee73c8bdd39f7af2a26635ca2;B;y;y;y;y;
+T17;7d1e50234515185ee73c8bdd39f7af2a26635ca2;C;n;n;n;y;has missing words & has scope type
+T18;8addf203c42698c485a4379d188b33fb24a7c684;A;n;n;y;y;has missing words
+T18;8addf203c42698c485a4379d188b33fb24a7c684;B;n;n;n;y;has missing words & starts with capital letter after type like docs: Rename
+T18;8addf203c42698c485a4379d188b33fb24a7c684;C;y;n;y;y;
+T19;95980d1f08f97fbfc141748aecf194f1b5013f22;A;y;y;y;y;
+T19;95980d1f08f97fbfc141748aecf194f1b5013f22;B;y;y;y;y;
+T19;95980d1f08f97fbfc141748aecf194f1b5013f22;C;y;y;y;y;
+T20;a0bd1f518e03818da6bbe7e6c47c4567722290e9;A;y;y;n;y;scope type
+T20;a0bd1f518e03818da6bbe7e6c47c4567722290e9;B;y;y;y;y;
+T20;a0bd1f518e03818da6bbe7e6c47c4567722290e9;C;y;y;y;y;
+T21;abe486e7e38d5ed103af603bfd5348f7db355948;A;y;y;n;y;starts with capital letter after type
+T21;abe486e7e38d5ed103af603bfd5348f7db355948;B;y;y;n;y;starts with capital letter after type
+T21;abe486e7e38d5ed103af603bfd5348f7db355948;C;y;y;y;y;
+T22;aea88c32804e95e99aa8c50f4e916713d49fd686;A;y;y;y;y;
+T22;aea88c32804e95e99aa8c50f4e916713d49fd686;B;y;y;y;y;
+T22;aea88c32804e95e99aa8c50f4e916713d49fd686;C;n;n;n;y;has missing words & has scope type
+T23;b0fed256f71aeaed9a0dac3cde81f6d98ee0724b;A;n;n;n;y;has missing words & starts with capital letter after type like docs: Rename
+T23;b0fed256f71aeaed9a0dac3cde81f6d98ee0724b;B;y;y;y;y;
+T23;b0fed256f71aeaed9a0dac3cde81f6d98ee0724b;C;y;n;y;y;
+T24;c13e674fb9f92ab9339d28a862d18de460faf56e;A;n;n;n;n;has missing words & has scope type
+T24;c13e674fb9f92ab9339d28a862d18de460faf56e;B;y;y;y;y;
+T24;c13e674fb9f92ab9339d28a862d18de460faf56e;C;y;y;y;n;
+T25;c346af2b6aa1c2796818405b4a960fc5c571594e;A;y;y;y;y;
+T25;c346af2b6aa1c2796818405b4a960fc5c571594e;B;y;y;y;y;
+T25;c346af2b6aa1c2796818405b4a960fc5c571594e;C;n;n;y;y;has missing words & has scope type
+T26;cb04cee7b2cdcc471e9bd9b90493a39e9053bebd;A;y;y;n;y;scope type
+T26;cb04cee7b2cdcc471e9bd9b90493a39e9053bebd;B;y;y;y;y;
+T26;cb04cee7b2cdcc471e9bd9b90493a39e9053bebd;C;y;y;y;y;
+T27;cd0ea0d479a276583fa181d8ecbc97fb0e4a9dce;A;y;n;y;n;
+T27;cd0ea0d479a276583fa181d8ecbc97fb0e4a9dce;B;y;n;y;n;
+T27;cd0ea0d479a276583fa181d8ecbc97fb0e4a9dce;C;n;n;n;n;has missing words & has scope type
+T28;d47f4f59084a26d8b47d864e961ddf76336a0ed8;A;n;n;y;y;has missing words
+T28;d47f4f59084a26d8b47d864e961ddf76336a0ed8;B;n;n;n;n;has missing words & starts with capital letter after type like docs: Rename
+T28;d47f4f59084a26d8b47d864e961ddf76336a0ed8;C;y;y;y;y;
+T29;ebc5c2b083a90fde6fced3521be434a414ef29dd;A;y;n;y;y;
+T29;ebc5c2b083a90fde6fced3521be434a414ef29dd;B;n;n;n;y;has missing words & has scope type
+T29;ebc5c2b083a90fde6fced3521be434a414ef29dd;C;n;n;y;y;has missing words
+T30;edc569e73bf08c2a573b12db38e185909bc1b11b;A;y;y;y;y;
+T30;edc569e73bf08c2a573b12db38e185909bc1b11b;B;y;y;y;y;
+T30;edc569e73bf08c2a573b12db38e185909bc1b11b;C;y;y;y;y;
+T31;f2ffbe31b036ee67e9c38d2a80466274d281ac5d;A;y;y;y;y;
+T31;f2ffbe31b036ee67e9c38d2a80466274d281ac5d;B;y;y;y;y;
+T31;f2ffbe31b036ee67e9c38d2a80466274d281ac5d;C;y;y;y;y;
+T32;f94eedc0eef695d94d256b076c85814126104bd1;A;y;y;y;y;
+T32;f94eedc0eef695d94d256b076c85814126104bd1;B;y;y;y;y;
+T32;f94eedc0eef695d94d256b076c85814126104bd1;C;y;y;y;y;
+T33;feb2f2edce2d91218a5e9a52c81e322e4033296b;A;y;y;y;y;
+T33;feb2f2edce2d91218a5e9a52c81e322e4033296b;B;y;y;n;y;scope type
+T33;feb2f2edce2d91218a5e9a52c81e322e4033296b;C;y;n;n;y;scope type
