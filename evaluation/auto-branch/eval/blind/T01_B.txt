@@ -1,0 +1,1 @@
+fix/64992-ng-content-not-rendered-in-nested-custom-element
