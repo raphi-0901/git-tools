@@ -1,1 +1,1 @@
-fix/issue-9247
+fix/9247-fix-compiler-sfc-duplicate-import
