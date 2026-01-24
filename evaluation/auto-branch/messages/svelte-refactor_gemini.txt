@@ -1,1 +1,1 @@
-fix/issue-10334-compiler-error-on-invalid-each-block
+feat/10334-rename-derived-call-to-derived-lazy
