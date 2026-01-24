@@ -20,12 +20,12 @@ mkdir -p "$BLIND_DIR" "$OUT_DIR"
 
 export RANDOM=$SEED
 
-echo "test_id,label,system,source_file" > "$KEY_FILE"
-echo "test_id,label,format,type,summary,overall" > "$RATINGS_FILE"
+echo "test_id,id,label,system,source_file" > "$KEY_FILE"
+echo "test_id,id,label,format,type,summary,overall" > "$RATINGS_FILE"
 
 test_idx=1
 
-# find unique commit hashes by stripping known suffixes
+# find unique branch identifier by stripping known suffixes
 identifiers=()
 
 for f in "$INPUT_DIR"/*_auto-branch.txt; do
@@ -68,10 +68,10 @@ for id in "${identifiers[@]}"; do
     dst="$BLIND_DIR/${test_id}_${labels[i]}.txt"
     cp "${files[i]}" "$dst"
 
-    echo "$test_id,${labels[i]},${systems[i]},$(basename "${files[i]}")" \
+    echo "$test_id,${id},${labels[i]},${systems[i]},$(basename "${files[i]}")" \
       >> "$KEY_FILE"
 
-    echo "$test_id,${labels[i]},,,,," >> "$RATINGS_FILE"
+    echo "$test_id,${id},${labels[i]},,,,," >> "$RATINGS_FILE"
   done
 
   test_idx=$((test_idx + 1))
