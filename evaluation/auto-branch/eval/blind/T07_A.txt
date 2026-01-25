@@ -1,1 +1,1 @@
-feature/9247-support-for-search-element
+fix/9247-style-attribute-css-var-ssr

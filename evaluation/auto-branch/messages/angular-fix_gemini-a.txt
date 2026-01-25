@@ -1,1 +1,1 @@
-fix/66051-broken-side-effects-link
+fix/66051-fix-broken-docs-link
