@@ -111,29 +111,31 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
         const chat = new LLMChat(finalGroqApiKey, initialMessages);
 
         let userDecision: BranchNameGenerationResult | null = null;
+        let branchName: string = ""
+        this.spinner.text = "Generating branch name from issue...";
+
         while (userDecision === null || !userDecision.finished) {
-            this.spinner.text = "Generating branch name from issue...";
             this.spinner.start()
+
             try {
-                const branchName = await chat.generate();
-                if (!branchName) {
-                    LOGGER.fatal(this, "No branch name received from Groq API");
-                }
-
-                this.spinner.stop()
-                this.timer.start("response")
-
-                userDecision = await this.handleUserDecision(branchName, chat);
-
-                LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
-                LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
-
+                branchName = await chat.generate();
             } catch (error) {
                 LOGGER.fatal(this, "Error while generating branch name: " + error)
             }
+
+            LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
+            LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
+
+            if (!branchName) {
+                LOGGER.fatal(this, "No branch name received from Groq API");
+            }
+
+            this.spinner.stop()
+            userDecision = await this.handleUserDecision(branchName, chat);
+            this.timer.start("response")
         }
 
-        if(userDecision.type !== "cancel") {
+        if (userDecision.type !== "cancel") {
             // means new branch was created
             await setBranchBackground(issue)
         }

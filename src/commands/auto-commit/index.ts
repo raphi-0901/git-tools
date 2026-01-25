@@ -100,8 +100,9 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
 
         let finished = false;
         let commitMessage = "";
+        this.spinner.text = "Generating commit message from staged files...";
+
         while (!finished) {
-            this.spinner.text = "Generating commit message from staged files...";
             this.spinner.start()
 
             try {
@@ -113,12 +114,11 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
             LOGGER.debug(this, `Tokens left: ${chat.remainingTokens}`)
             LOGGER.debug(this, `Time taken: ${this.timer.stop("response")}`)
 
-            this.spinner.stop()
-
             if (!commitMessage) {
                 LOGGER.fatal(this, "No commit message received from Groq API");
             }
 
+            this.spinner.stop()
             finished = await this.handleUserDecision(commitMessage, chat, this.flags.reword);
             this.timer.start("response")
         }
