@@ -1,1 +1,1 @@
-fix/14262-ssr-props-modifiers-not-handled
+fix/14262-props-modifiers-render-functions-ssr
