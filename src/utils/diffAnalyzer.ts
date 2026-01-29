@@ -113,6 +113,34 @@ async function diffFilesPerType(params: DiffAnalyzerParams): Promise<FilesPerDif
         }
     }
 
+    // handle edge case, see https://github.com/raphi-0901/git-tools/issues/56
+    if (nonSyntacticChangesFiles.size > 0 && relevantDiffs.size === 0 && deletedFiles.size === 0 && ignoredFilesStats.size === 0) {
+        // move nonSyntacticChangesFiles to relevantDiffs, but at most 3 files
+        const nonSyntacticChangesFilesArray = [...nonSyntacticChangesFiles]
+        nonSyntacticChangesFiles.clear()
+
+        const expandedDiffs = await Promise.all(nonSyntacticChangesFilesArray.map(async file => ({
+                diff: await git.raw([
+                    ...baseArgs,
+                    "--pretty=format:",
+                    "--ignore-blank-lines",
+                    file
+                ]),
+                file
+            })))
+
+        let counter = 0;
+        for (const { diff, file } of expandedDiffs) {
+            if(diff.trim() === "" || counter >= 3) {
+                nonSyntacticChangesFiles.add(file)
+            }
+            else {
+                counter++;
+                relevantDiffs.add(diff)
+            }
+        }
+    }
+
     return {
         deletedFiles,
         ignoredFilesStats,
@@ -236,9 +264,9 @@ function shouldIncludeFile(file: string, ignorePatterns: string[] = [
  */
 function isMeaningfulChange(line: string): boolean {
     return (line.startsWith("+") || line.startsWith("-")) &&
-    !line.startsWith("+++ ") &&
-    !line.startsWith("--- ") &&
-    line.slice(1).trim() !== "";
+        !line.startsWith("+++ ") &&
+        !line.startsWith("--- ") &&
+        line.slice(1).trim() !== "";
 }
 
 /**
@@ -322,7 +350,7 @@ export function filterDiffForLLM(diff: string): string {
         }
 
         // check for empty context lines
-        if(line.trim() === "") {
+        if (line.trim() === "") {
             continue;
         }
 
