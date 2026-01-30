@@ -11,29 +11,29 @@ const stackColors = [
     '#5B8C5A'  // dark green
 ];
 
-// Grouped bar chart: Failure modes (counts) for Gemini vs Gemini Advanced
+const roundTo2Dec = (num) => Math.round(num * 100) / 100;
+
+// Grouped bar chart: Precision/Recall (%)
 option = {
     dataset: {
         source: [
-            ['Failure Mode', 'Gemini CLI', 'Gemini CLI Advanced'],
-            ['Unsafe Git\nbehavior', 0, 2],
-            ['Infinite behavior', 0, 2],
-            ['Execution failure', 1, 3],
-            ['Human intervention', 24, 0],
-            ['Malformed output', 20, 12]
+            ['', 'Precision', 'Recall'],
+            ['branch-cleanup', 100, 100],
+            ['Gemini CLI', roundTo2Dec((80 / (80 + 11)) * 100), roundTo2Dec((80 / 150) * 100)],
+            ['Gemini CLI Advanced', roundTo2Dec((116 / (116 + 2)) * 100), roundTo2Dec((116 / 150) * 100)]
         ]
     },
     grid: {
         bottom: 50,
         containLabel: true,
-        left: 40,
-        right: 40,
-        top: 60
+        left: 20,
+        right: 20,
+        top: 80
     },
     legend: {
         bottom: 20,
         textStyle: {
-            fontSize: FONT.legend
+            fontSize: FONT.legend // ✅ centralized
         }
     },
     series: [
@@ -44,12 +44,12 @@ option = {
                 color: stackColors[0]
             },
             label: {
-                fontSize: FONT.barLabel,
+                fontSize: FONT.barLabel, // ✅ centralized
                 formatter: ({ value }) => value[1] || "",
                 position: 'inside',
                 show: true
             },
-            name: 'Gemini CLI',
+            name: 'Precision',
             type: 'bar'
         },
         {
@@ -59,12 +59,12 @@ option = {
                 color: stackColors[1]
             },
             label: {
-                fontSize: FONT.barLabel,
+                fontSize: FONT.barLabel, // ✅ centralized
                 formatter: ({ value }) => value[2] || "",
                 position: 'inside',
                 show: true
             },
-            name: 'Gemini CLI Advanced',
+            name: 'Recall',
             type: 'bar'
         }
     ],
@@ -74,23 +74,23 @@ option = {
     },
     xAxis: {
         axisLabel: {
-            fontSize: FONT.axisLabel,
+            fontSize: FONT.axisLabel, // ✅ centralized
             interval: 0,
             rotate: 25
         },
         nameTextStyle: {
-            fontSize: FONT.axisName
+            fontSize: FONT.axisName // ✅ centralized (future-proof)
         },
         type: 'category'
     },
     yAxis: {
         axisLabel: {
-            fontSize: FONT.axisLabel
+            fontSize: FONT.axisLabel // ✅ centralized
         },
         minInterval: 1,
-        name: 'Occurrences',
+        name: 'Percentage',
         nameTextStyle: {
-            fontSize: FONT.axisName
+            fontSize: FONT.axisName // ✅ centralized
         },
         type: 'value'
     }

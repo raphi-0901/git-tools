@@ -1,3 +1,11 @@
+// ===== FONT SIZE VARIABLES (same as yours) =====
+const FONT = {
+    axisLabel: 20,
+    axisName: 20,
+    barLabel: 16,
+    legend: 20
+};
+
 const stackColors = [
     '#3A5F7D', // dark blue
     '#5B8C5A', // dark green
@@ -7,99 +15,62 @@ const stackColors = [
 ];
 
 const series = [
-    {
-        data: [33, 32, 30],
-        name: 'SUCCESS',
-        stack: 'a',
-        type: 'bar'
-    },
-    {
-        data: [33, 13, 24],
-        name: 'WHAT',
-        stack: 'a',
-        type: 'bar'
-    },
-    {
-        data: [21, 11, 24],
-        name: 'WHY',
-        stack: 'a',
-        type: 'bar'
-    },
-    {
-        data: [33, 22, 29],
-        name: 'FORMAT',
-        stack: 'a',
-        type: 'bar'
-    },
-    {
-        data: [28, 23, 30],
-        name: 'TYPE',
-        stack: 'a',
-        type: 'bar'
-    }
+    { data: [33, 32, 30], name: 'SUCCESS', stack: 'a', type: 'bar' },
+    { data: [33, 13, 24], name: 'WHAT',    stack: 'a', type: 'bar' },
+    { data: [21, 11, 24], name: 'WHY',     stack: 'a', type: 'bar' },
+    { data: [33, 22, 29], name: 'FORMAT',  stack: 'a', type: 'bar' },
+    { data: [28, 23, 30], name: 'TYPE',    stack: 'a', type: 'bar' }
 ];
 
+// ===== COLOR + BORDER =====
 for (const [i, s] of series.entries()) {
     s.itemStyle = {
+        borderColor: '#ffffff',
+        borderWidth: 1,
         color: stackColors[i]
     };
 }
 
-for (const s of series) {
-    s.itemStyle = {
-        ...s.itemStyle,
-        borderColor: '#ffffff',
-        borderWidth: 1
-    };
-}
-
-
-
+// ===== STACK BORDER RADIUS INFO =====
 const stackInfo = {};
 for (let i = 0; i < series[0].data.length; ++i) {
     for (const [j, element] of series.entries()) {
         const stackName = element.stack;
-        if (!stackName) {
-            continue;
-        }
+        if (!stackName) continue;
 
         if (!stackInfo[stackName]) {
-            stackInfo[stackName] = {
-                stackEnd: [],
-                stackStart: []
-            };
+            stackInfo[stackName] = { stackEnd: [], stackStart: [] };
         }
 
         const info = stackInfo[stackName];
         const data = element.data[i];
-        if (data && data !== '-') {
-            if (info.stackStart[i] == null) {
-                info.stackStart[i] = j;
-            }
 
+        if (data && data !== '-') {
+            if (info.stackStart[i] == null) info.stackStart[i] = j;
             info.stackEnd[i] = j;
         }
     }
 }
 
+// ===== PER-BAR LABEL + RADIUS =====
 for (const [i, element] of series.entries()) {
-    const { data,name } = element;
     const info = stackInfo[element.stack];
+
     for (let j = 0; j < element.data.length; ++j) {
-        // const isStart = info.stackStart[j] === i;
         const isEnd = info.stackEnd[j] === i;
         const topBorder = isEnd ? 20 : 0;
-        const bottomBorder = 0;
-        data[j] = {
+
+        element.data[j] = {
             itemStyle: {
-                borderRadius: [topBorder, topBorder, bottomBorder, bottomBorder]
+                borderRadius: [topBorder, topBorder, 0, 0]
             },
             label: {
+                fontSize: FONT.barLabel, // ✅ centralized
                 formatter: '{@value}',
                 position: 'inside',
                 show: true
             },
-            value: data[j]
+            value: element.data[j]
         };
     }
 }
@@ -109,27 +80,42 @@ option = {
         bottom: 30,
         containLabel: true,
         left: 20,
-        right: 100,   // ggf. größer, wenn Legende rechts ist
+        right: 100,
         top: 20
     },
 
     legend: {
         data: ['TYPE', 'FORMAT', 'WHY', 'WHAT', 'SUCCESS'],
         itemGap: 12,
-        orient: 'vertical',   // ⬅ vertikal
-        right: 10,            // oder: left: 10
-        top: 'middle'        // vertikal zentriert
+        orient: 'vertical',
+        right: 0,
+        textStyle: {
+            fontSize: FONT.legend // ✅ centralized
+        },
+        top: 'middle'
     },
 
     series,
 
     xAxis: {
-        data: ['auto-commit', 'Gemini', 'Gemini Advanced'],
+        axisLabel: {
+            fontSize: FONT.axisLabel // ✅ centralized
+        },
+        data: ['auto-commit', 'Gemini CLI', 'Gemini CLI Advanced'],
+        nameTextStyle: {
+            fontSize: FONT.axisName // ✅ centralized (future-proof)
+        },
         type: 'category'
     },
 
     yAxis: {
-        show: false,           // Y-Achse aus
+        axisLabel: {
+            fontSize: FONT.axisLabel // (doesn't show, but safe)
+        },
+        nameTextStyle: {
+            fontSize: FONT.axisName // (doesn't show, but safe)
+        },
+        show: false,
         type: 'value'
     }
 };
