@@ -33,6 +33,10 @@ export async function obtainValidGroqApiKey(
         try {
             ctx.spinner.start();
             remainingTokensForLLM = await chat.getRemainingTokens();
+
+            // leave buffer for output tokens
+            remainingTokensForLLM = Math.min(300, Math.max(0, remainingTokensForLLM - 300));
+
             ctx.spinner.stop();
 
             LOGGER.debug(ctx, `Remaining tokens for LLM: ${remainingTokensForLLM}`);
