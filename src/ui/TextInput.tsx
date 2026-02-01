@@ -33,6 +33,11 @@ function TextInputWithCancel({
         }
     });
 
+    const handleChange = (input: string) => {
+        setInputValue(input);
+        setValidationMessage(null);
+    }
+
     const handleSubmit = () => {
         if (validate && typeof validate === 'function') {
             const isValid = validate(inputValue);
@@ -71,15 +76,17 @@ function TextInputWithCancel({
     }
 
     return (
-        <Box>
-            {renderQuestion(message)}
-            <Text>{" "}</Text>
-            <TextInput
-                focus={true}
-                onChange={setInputValue}
-                onSubmit={handleSubmit}
-                value={inputValue}
-            />
+        <Box flexDirection={"column"}>
+            <Box>
+                {renderQuestion(message)}
+                <Text>{" "}</Text>
+                <TextInput
+                    focus={true}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    value={inputValue}
+                />
+            </Box>
             {validationMessage && <Text color="red">{validationMessage}</Text>}
         </Box>
     );
