@@ -1,5 +1,6 @@
 import { Args } from "@oclif/core";
 import chalk from "chalk";
+import { z } from "zod";
 
 import { CommonFlagsBaseCommand } from "../../base-commands/CommonFlagsBaseCommand.js";
 import { getService } from "../../services/index.js";
@@ -46,9 +47,9 @@ type BranchNameGenerationResult = {
 export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof AutoBranchCommand> {
     static args = {
         issueUrl: Args.string({
-            description: "Jira issue ID to fetch",
+            description: `Issue URL. Supported providers: GitHub, GitLab, and Jira`,
             name: "issueUrl",
-            required: true,
+            required: false,
         }),
     };
     static description = "Generate Git branch names from Jira tickets with AI suggestions and interactive feedback";
@@ -64,12 +65,18 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
         this.timer.start("response");
         await checkIfInGitRepository(this);
 
-        if (!URL.canParse(this.args.issueUrl)) {
+        const issueUrl = this.args.issueUrl ?? await withPromptExit(this, () => renderTextInput({
+            message: "Enter Issue URL:",
+            validate(input) {
+                return z.url().safeParse(input).success || "Not a valid URL";
+            }
+        }));
+
+        if(!z.url().safeParse(issueUrl).success){
             LOGGER.fatal(this, "IssueUrl was not a URL.");
         }
 
-        const issueUrl = new URL(this.args.issueUrl);
-        const { hostname } = issueUrl;
+        const { hostname } = new URL(issueUrl);
 
         const finalConfig = await this.getFinalConfig(hostname);
         const { askForSavingSettings, finalServiceConfigOfHostname } = finalConfig
@@ -89,7 +96,7 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
             LOGGER.fatal(this, `Error while creating service for hostname: ${hostname}`);
         }
 
-        const issue = await service.getIssue(new URL(this.args.issueUrl))
+        const issue = await service.getIssue(new URL(issueUrl))
         if (!issue) {
             LOGGER.fatal(
                 this,
