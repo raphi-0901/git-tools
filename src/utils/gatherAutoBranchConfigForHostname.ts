@@ -4,6 +4,7 @@ import { AutoBranchServiceConfig, AutoBranchServiceTypeValues } from "../zod-sch
 import { promptForTextConfigValue } from "./config/promptForConfigValue.js";
 import { SIGINT_ERROR_NUMBER } from "./constants.js";
 import { getSchemaForUnionOfAutoBranch } from "./getSchemaForUnionOfAutoBranch.js";
+import { withPromptExit } from "./withPromptExist.js";
 
 /**
  * Interactively gathers and builds the AutoBranch service configuration
@@ -33,14 +34,10 @@ export async function gatherAutoBranchConfigForHostname(ctx: AutoBranchCommand, 
             ? { label: "delete", value: "delete" } as const
             : null;
 
-    const serviceType = await renderSelectInput({
+    const serviceType = await withPromptExit(ctx, () => renderSelectInput({
         items: deleteChoice ? [...baseServiceChoices, deleteChoice] : baseServiceChoices,
         message: "Select your service type",
-    });
-
-    if (serviceType === null) {
-        ctx.exit(SIGINT_ERROR_NUMBER)
-    }
+    }));
 
     if (serviceType === 'delete') {
         return
