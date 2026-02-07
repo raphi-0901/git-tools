@@ -74,8 +74,14 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start()
 
+
+        const git = getSimpleGit();
+        const branchSummary = await git.branch();
+        const currentBranch = branchSummary.current;
+
         const branchBackground = this.flags.ignoreBranchInformation ? null : await getBranchBackground()
-        const initialMessages = await this.buildInitialMessages({
+        const initialMessages = this.buildInitialMessages({
+            currentBranch,
             examples: finalExamples,
             instructions: finalInstructions,
             issue: branchBackground
@@ -140,19 +146,17 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         })
     }
 
-    private async buildInitialMessages({
+    private buildInitialMessages({
+                                           currentBranch,
                                            examples,
                                            instructions,
-                                           issue,
+                                           issue
                                        }: {
+        currentBranch?: string,
         examples: string[],
         instructions: string,
-        issue?: IssueSummary | null
+        issue?: IssueSummary | null,
     }) {
-        const git = getSimpleGit();
-        const branchSummary = await git.branch();
-        const currentBranch = branchSummary.current;
-
         return [
             {
                 content: `
@@ -178,9 +182,9 @@ Strict rules:
             },
             {
                 content: `
-User Instructions: ${instructions}
+${this.renderInstructionsForPrompt(instructions)}
 
-Current Branch: ${currentBranch}
+${this.renderCurrentBranchForPrompt(currentBranch)}
 
 ${this.renderIssueInformationForPrompt(issue)}
 
@@ -202,7 +206,7 @@ ${this.renderExamplesForPrompt(examples)}
 
         let askForSavingSettings = false;
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
-        if (!finalGroqApiKey) {
+        if (finalGroqApiKey === undefined) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
             finalGroqApiKey = await promptForTextConfigValue(this, {
                 schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
@@ -212,7 +216,7 @@ ${this.renderExamplesForPrompt(examples)}
         }
 
         let finalInstructions = userConfig.INSTRUCTIONS;
-        if (!finalInstructions) {
+        if (finalInstructions === undefined) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
             finalInstructions = await promptForTextConfigValue(this, {
                 currentValue: "Keep it short and conventional",
@@ -223,7 +227,7 @@ ${this.renderExamplesForPrompt(examples)}
         }
 
         let finalExamples = userConfig.EXAMPLES;
-        if (!finalExamples) {
+        if (finalExamples === undefined) {
             LOGGER.warn(this, "No EXAMPLES set in your config.");
 
             const examples = []
@@ -315,12 +319,25 @@ ${this.renderExamplesForPrompt(examples)}
         }
     }
 
+    private renderCurrentBranchForPrompt(currentBranch?: string) {
+        if(!currentBranch?.trim()) {
+            return ""
+        }
+
+        return "Current Branch: " + currentBranch
+    }
+
     private renderExamplesForPrompt(examples: string[]) {
         if(examples.length === 0) {
             return ""
         }
 
         return "Examples of good commit messages: \n" + examples.join("\n") + "\n\n"
+    }
+
+    private renderInstructionsForPrompt(instructions?: string) {
+        const conventionalCommitInstruction = "Use conventional commits but omit the optional scope. Try to add the WHY aspect to the commit message. The following types for conventional commits are: feat | fix | refactor | docs | test | build | chore | ci. The first line should be maximum of 52 chars, if it is longer then break it into a shorter title and an additional body."
+        return "User Instructions: " + (instructions?.trim() || conventionalCommitInstruction)
     }
 
     private renderIssueInformationForPrompt(issue?: IssueSummary | null) {
