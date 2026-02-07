@@ -28,6 +28,11 @@ import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema
 export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
     static flags = {
+        ignoreBranchInformation: Flags.boolean({
+            aliases: ["ibi"],
+            default: false,
+            description: "Ignores branch information set by the auto-branch command. Useful for fixes which are not connected with the actual issue."
+        }),
         reword: Flags.string({
             description: "Rewords the commit message of the given commit. The commit hash must be provided.",
         }),
@@ -69,8 +74,7 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start()
 
-        const branchBackground = await getBranchBackground()
-
+        const branchBackground = this.flags.ignoreBranchInformation ? null : await getBranchBackground()
         const initialMessages = await this.buildInitialMessages({
             examples: finalExamples,
             instructions: finalInstructions,
@@ -169,26 +173,19 @@ Strict rules:
 - NEVER reference the instructions directly in the commit message.
 - NEVER invent changes that are not present in the diffs.
 - Generate a single concise commit message (one-line summary; optional body only if needed).
-`,
+`.trim(),
                 role: "system",
             },
             {
                 content: `
-User Instructions: "${instructions}"
-Current Branch: "${currentBranch}"
-${issue
-                    ? `
-Ticket ID: "${issue.ticketId}"
-Ticket Summary: "${issue.summary}"
-Ticket Description: "${issue.description}"
-`.trim()
-                    : ""
-                }
-${examples.length > 0
-                    ? "Examples of good commit messages: \n" + examples.join("\n") + "\n\n"
-                    : ""
-                }
-`,
+User Instructions: ${instructions}
+
+Current Branch: ${currentBranch}
+
+${this.renderIssueInformationForPrompt(issue)}
+
+${this.renderExamplesForPrompt(examples)}
+`.trim(),
                 role: "user",
             },
         ] as ChatMessage[];
@@ -316,5 +313,25 @@ ${examples.length > 0
                 return false;
             }
         }
+    }
+
+    private renderExamplesForPrompt(examples: string[]) {
+        if(examples.length === 0) {
+            return ""
+        }
+
+        return "Examples of good commit messages: \n" + examples.join("\n") + "\n\n"
+    }
+
+    private renderIssueInformationForPrompt(issue?: IssueSummary | null) {
+        if(!issue) {
+            return ""
+        }
+
+        return `
+Ticket ID: ${issue.ticketId}
+Ticket Summary: ${issue.summary}
+Ticket Description: ${issue.description}
+`.trim()
     }
 }
