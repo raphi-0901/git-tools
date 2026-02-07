@@ -22,6 +22,7 @@
     "gpt-tokenizer": "^3.2.0",
     "ink": "^6.5.0",
     "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
     "is-online": "^12.0.1",
     "jira.js": "^5.2.2",
     "js-yaml": "^4.1.1",
@@ -89,7 +90,6 @@
     "lint:fix": "eslint --fix",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",
-    "prepack": "oclif manifest && oclif readme",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
     "version": "oclif readme && git add README.md"
   },
