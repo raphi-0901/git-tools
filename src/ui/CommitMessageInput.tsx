@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 
 import { renderAnsweredQuestion } from "./helper/renderAnsweredQuestion.js";
 import { renderCancelledQuestion } from "./helper/renderCancelledQuestion.js";
+import { renderQuestion } from "./helper/renderQuestion.js";
 import { renderInkComponent } from "./renderInkComponent.js";
 import { TextArea, TextAreaValue } from "./TextArea.js";
 
@@ -58,7 +59,8 @@ const CommitMessageInput = ({ defaultValues, message, onCancel, onSubmit }: InkF
             onSubmit({
                 description: commitDescription,
                 message: commitMessage
-            });        }
+            });
+        }
     }, [isSubmitting]);
 
     const renderCommitMessage = () => activeInput === "first" ? (
@@ -90,36 +92,41 @@ const CommitMessageInput = ({ defaultValues, message, onCancel, onSubmit }: InkF
     </Box>
 
     if (isSubmitting) {
-        return renderAnsweredQuestion(message, `${commitMessage}`)
+        return renderAnsweredQuestion(message, `${commitMessage ?? "No commit message given."}`)
     }
 
     if (isCancelling) {
         return renderCancelledQuestion(message)
     }
 
-    return <Box flexDirection="column" gap={1}>
-        <TitledBox
-            borderColor={activeInput === "first" ? "#ff9900" : undefined}
-            borderStyle="round"
-            flexDirection="column"
-            titleJustify="space-between"
-            titles={["Reword commit message", `${commitMessage.length} chars`]}
-        >
-            {renderCommitMessage()}
-        </TitledBox>
+    return (
+        <Box flexDirection="column">
+            {renderQuestion(message)}
+            <Box flexDirection="column" gap={1}>
+                <TitledBox
+                    borderColor={activeInput === "first" ? "#ff9900" : undefined}
+                    borderStyle="round"
+                    flexDirection="column"
+                    titleJustify="space-between"
+                    titles={["Commit message", `${commitMessage.length} chars`]}
+                >
+                    {renderCommitMessage()}
+                </TitledBox>
 
-        <TitledBox
-            borderColor={activeInput === "second" ? "#ff9900" : undefined}
-            borderStyle="round"
-            flexDirection="column"
-            titleJustify="space-between"
-            titles={["Commit description"]}
-        >
-            {renderCommitDescription()}
-        </TitledBox>
+                <TitledBox
+                    borderColor={activeInput === "second" ? "#ff9900" : undefined}
+                    borderStyle="round"
+                    flexDirection="column"
+                    titleJustify="space-between"
+                    titles={["Commit description"]}
+                >
+                    {renderCommitDescription()}
+                </TitledBox>
 
-        {renderHelpText()}
-    </Box>
+                {renderHelpText()}
+            </Box>
+        </Box>
+    )
 };
 
 export function renderCommitMessageInput({
