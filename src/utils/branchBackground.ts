@@ -3,7 +3,7 @@ import { getSimpleGit } from "./getSimpleGit.js";
 
 
 
-export async function getBranchBackground() {
+export async function getBranchBackground(): Promise<IssueSummary | null> {
     const git = getSimpleGit();
 
     const branch = (await git.branch()).current;
