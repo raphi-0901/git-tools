@@ -9,6 +9,7 @@ import { renderSelectInput } from "../../ui/SelectInput.js";
 import { renderTextInput } from "../../ui/TextInput.js";
 import { setBranchBackground } from "../../utils/branchBackground.js";
 import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
+import { getAutoBranchConfig } from "../../utils/config/autoBranchConfig.js";
 import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
 import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
@@ -19,14 +20,7 @@ import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
-import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
-import {
-    AutoBranchConfigSchema,
-    AutoBranchServiceConfig,
-    AutoBranchServiceTypeValues,
-    AutoBranchUpdateConfig
-} from "../../zod-schema/autoBranchConfig.js";
 
 type BranchNameGenerationResult = {
     branchName: string,
@@ -76,17 +70,11 @@ export default class AutoBranchCommand extends CommonFlagsBaseCommand<typeof Aut
             LOGGER.fatal(this, "IssueUrl was not a URL.");
         }
 
-        const { hostname } = new URL(issueUrl);
-
-        const finalConfig = await this.getFinalConfig(hostname);
-        const { askForSavingSettings, finalServiceConfigOfHostname } = finalConfig
-        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
-
         await isOnline(this)
-        const {
-            groqApiKey: finalGroqApiKey,
-            remainingTokensForLLM
-        } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
+        const { hostname } = new URL(issueUrl);
+        const finalConfig = await getAutoBranchConfig(this, hostname);
+        const { askForSavingSettings, finalGroqApiKey, finalServiceConfigOfHostname, remainingTokensForLLM } = finalConfig
+        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
         this.spinner.text = "Analyzing issue for branch name generation..."
         this.spinner.start();
@@ -204,68 +192,6 @@ Ticket Description: "${issue.description}"
                 role: "user",
             },
         ];
-    }
-
-    private async getFinalConfig(hostname: string) {
-        const userConfig = await loadMergedUserConfig<AutoBranchUpdateConfig>(this);
-
-        let askForSavingSettings = false;
-        let finalGroqApiKey = userConfig.GROQ_API_KEY;
-        if (!finalGroqApiKey) {
-            LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForTextConfigValue(this, {
-                schema: AutoBranchConfigSchema.shape.GROQ_API_KEY,
-            });
-            askForSavingSettings = true;
-        }
-
-        let finalServiceConfigOfHostname: AutoBranchServiceConfig | undefined;
-        const allHostnamesFromConfig = userConfig.HOSTNAMES ?? {};
-        if (allHostnamesFromConfig[hostname] === undefined) {
-            LOGGER.warn(this, `No config found for hostname: ${hostname}`);
-            askForSavingSettings = true;
-            finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(this, Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
-            if (!finalServiceConfigOfHostname) {
-                // should never happen
-                LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
-            }
-        } else {
-            const serviceType = allHostnamesFromConfig[hostname].type;
-            if (!serviceType || !AutoBranchServiceTypeValues.includes(serviceType)) {
-                LOGGER.fatal(
-                    this,
-                    `Not supported type "${serviceType}" found for: ${hostname}\nAvailable service types: ${AutoBranchServiceTypeValues.join(", ")}`,
-                );
-            }
-
-            const serviceConfig = allHostnamesFromConfig[hostname]!;
-            const schemaForType = getSchemaForUnionOfAutoBranch(serviceType)!;
-
-            // validate against schema
-            const isSafe = schemaForType.safeParse(serviceConfig)
-            if (isSafe.success) {
-                finalServiceConfigOfHostname = isSafe.data;
-            } else {
-                LOGGER.debug(this, `Invalid config found for hostname: ${hostname}. Error: ${isSafe.error.message}`)
-                askForSavingSettings = true;
-                finalServiceConfigOfHostname = await gatherAutoBranchConfigForHostname(this, Object.keys(allHostnamesFromConfig), hostname, allHostnamesFromConfig[hostname]);
-                if (!finalServiceConfigOfHostname) {
-                    // should never happen
-                    LOGGER.fatal(this, `No service config found for hostname: ${hostname}`)
-                }
-            }
-        }
-
-        if (!finalServiceConfigOfHostname) {
-            // should never happen
-            LOGGER.fatal(this, `No service config found for hostname: ${hostname}`);
-        }
-
-        return {
-            askForSavingSettings,
-            finalGroqApiKey,
-            finalServiceConfigOfHostname,
-        }
     }
 
     private async handleUserDecision(branchName: string, chat: LLMChat): Promise<BranchNameGenerationResult> {

@@ -10,20 +10,17 @@ import { getBranchBackground } from "../../utils/branchBackground.js";
 import { checkIfCommitExists } from "../../utils/checkIfCommitExists.js";
 import { checkIfFilesStaged } from "../../utils/checkIfFilesStaged.js";
 import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
-import { promptForTextConfigValue } from "../../utils/config/promptForConfigValue.js";
+import { getAutoCommitConfig } from "../../utils/config/autoCommitConfig.js";
 import { saveGatheredSettings } from "../../utils/config/saveGatheredSettings.js";
-import { loadMergedUserConfig } from "../../utils/config/userConfigHelpers.js";
 import { diffAnalyzer, DiffAnalyzerParams } from "../../utils/diffAnalyzer.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import { countTokens } from "../../utils/gptTokenizer.js";
 import { isOnline } from "../../utils/isOnline.js";
 import { ChatMessage, LLMChat } from "../../utils/LLMChat.js";
 import * as LOGGER from "../../utils/logging.js";
-import { obtainValidGroqApiKey } from "../../utils/obtainValidGroqApiKey.js";
 import { rewordCommit } from "../../utils/rewordCommitMessage.js";
 import { transformGeneratedCommitMessage } from "../../utils/transformGeneratedCommitMessage.js";
 import { withPromptExit } from "../../utils/withPromptExist.js";
-import { AutoCommitConfigSchema, AutoCommitUpdateConfig } from "../../zod-schema/autoCommitConfig.js";
 
 export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof AutoCommitCommand> {
     static description = "Automatically generate commit messages from staged files with feedback loop";
@@ -61,15 +58,10 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
             }
         }
 
-        const finalConfig = await this.getFinalConfig();
-        const { askForSavingSettings, finalExamples, finalInstructions } = finalConfig;
-        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
-
         await isOnline(this)
-        const {
-            groqApiKey: finalGroqApiKey,
-            remainingTokensForLLM
-        } = await obtainValidGroqApiKey(this, finalConfig.finalGroqApiKey)
+        const finalConfig = await getAutoCommitConfig(this);
+        const { askForSavingSettings, finalExamples, finalGroqApiKey, finalInstructions, remainingTokensForLLM } = finalConfig;
+        LOGGER.debug(this, `Final config: ${JSON.stringify(finalConfig, null, 2)}`)
 
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start()
@@ -201,62 +193,6 @@ ${this.renderExamplesForPrompt(examples, needsFallbackToConventionalCommit)}
         const git = getSimpleGit();
 
         await (rewordCommitHash ? rewordCommit(rewordCommitHash, commitMessage) : git.commit(commitMessage));
-    }
-
-    private async getFinalConfig() {
-        const userConfig = await loadMergedUserConfig<AutoCommitUpdateConfig>(this);
-
-        let askForSavingSettings = false;
-        let finalGroqApiKey = userConfig.GROQ_API_KEY;
-        if (finalGroqApiKey === undefined) {
-            LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
-            finalGroqApiKey = await promptForTextConfigValue(this, {
-                schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
-            });
-
-            askForSavingSettings = true;
-        }
-
-        let finalInstructions = userConfig.INSTRUCTIONS;
-        if (finalInstructions === undefined) {
-            LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
-            finalInstructions = await promptForTextConfigValue(this, {
-                currentValue: "Keep it short and conventional",
-                schema: AutoCommitConfigSchema.shape.INSTRUCTIONS
-            })
-
-            askForSavingSettings = true;
-        }
-
-        let finalExamples = userConfig.EXAMPLES;
-        if (finalExamples === undefined) {
-            LOGGER.warn(this, "No EXAMPLES set in your config.");
-
-            const examples = []
-            while (true) {
-                const result = await withPromptExit(this, () => renderCommitMessageInput({
-                    message: "Provide some examples of commit messages you would like to generate: (leave empty if you don't want to provide any further examples)"
-                }))
-
-                if (result.message.trim() === "" && result?.description.join(',').trim() === "") {
-                    break;
-                }
-
-                const example = `${result?.message}\n${result?.description.join("\n")}`
-                examples.push(example)
-            }
-
-            finalExamples = examples
-            askForSavingSettings = true;
-        }
-
-
-        return {
-            askForSavingSettings,
-            finalExamples,
-            finalGroqApiKey,
-            finalInstructions,
-        }
     }
 
     private async handleUserDecision(commitMessage: string, chat: LLMChat, rewordCommitHash?: string) {
