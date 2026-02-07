@@ -74,8 +74,14 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         this.spinner.text = "Analyzing staged files for commit message generation..."
         this.spinner.start()
 
+
+        const git = getSimpleGit();
+        const branchSummary = await git.branch();
+        const currentBranch = branchSummary.current;
+
         const branchBackground = this.flags.ignoreBranchInformation ? null : await getBranchBackground()
-        const initialMessages = await this.buildInitialMessages({
+        const initialMessages = this.buildInitialMessages({
+            currentBranch,
             examples: finalExamples,
             instructions: finalInstructions,
             issue: branchBackground
@@ -140,18 +146,18 @@ export default class AutoCommitCommand extends CommonFlagsBaseCommand<typeof Aut
         })
     }
 
-    private async buildInitialMessages({
-                                           examples,
-                                           instructions,
-                                           issue,
-                                       }: {
+    private buildInitialMessages({
+                                     currentBranch,
+                                     examples,
+                                     instructions,
+                                     issue
+                                 }: {
+        currentBranch?: string,
         examples: string[],
         instructions: string,
-        issue?: IssueSummary | null
+        issue?: IssueSummary | null,
     }) {
-        const git = getSimpleGit();
-        const branchSummary = await git.branch();
-        const currentBranch = branchSummary.current;
+        const needsFallbackToConventionalCommit = examples.length === 0 && instructions.trim() === "";
 
         return [
             {
@@ -178,13 +184,13 @@ Strict rules:
             },
             {
                 content: `
-User Instructions: ${instructions}
+${this.renderInstructionsForPrompt(instructions, needsFallbackToConventionalCommit)}
 
-Current Branch: ${currentBranch}
+${this.renderCurrentBranchForPrompt(currentBranch)}
 
 ${this.renderIssueInformationForPrompt(issue)}
 
-${this.renderExamplesForPrompt(examples)}
+${this.renderExamplesForPrompt(examples, needsFallbackToConventionalCommit)}
 `.trim(),
                 role: "user",
             },
@@ -202,7 +208,7 @@ ${this.renderExamplesForPrompt(examples)}
 
         let askForSavingSettings = false;
         let finalGroqApiKey = userConfig.GROQ_API_KEY;
-        if (!finalGroqApiKey) {
+        if (finalGroqApiKey === undefined) {
             LOGGER.warn(this, "No GROQ_API_KEY set in your config.");
             finalGroqApiKey = await promptForTextConfigValue(this, {
                 schema: AutoCommitConfigSchema.shape.GROQ_API_KEY,
@@ -212,7 +218,7 @@ ${this.renderExamplesForPrompt(examples)}
         }
 
         let finalInstructions = userConfig.INSTRUCTIONS;
-        if (!finalInstructions) {
+        if (finalInstructions === undefined) {
             LOGGER.warn(this, "No INSTRUCTIONS set in your config.");
             finalInstructions = await promptForTextConfigValue(this, {
                 currentValue: "Keep it short and conventional",
@@ -223,7 +229,7 @@ ${this.renderExamplesForPrompt(examples)}
         }
 
         let finalExamples = userConfig.EXAMPLES;
-        if (!finalExamples) {
+        if (finalExamples === undefined) {
             LOGGER.warn(this, "No EXAMPLES set in your config.");
 
             const examples = []
@@ -315,16 +321,45 @@ ${this.renderExamplesForPrompt(examples)}
         }
     }
 
-    private renderExamplesForPrompt(examples: string[]) {
-        if(examples.length === 0) {
+    private renderCurrentBranchForPrompt(currentBranch?: string) {
+        if (!currentBranch?.trim()) {
+            return ""
+        }
+
+        return "Current Branch: " + currentBranch
+    }
+
+    private renderExamplesForPrompt(examples: string[], fallbackToConventionalCommit?: boolean) {
+        if (fallbackToConventionalCommit) {
+            examples = [
+                "fix: handle null values in user profile response\nPreviously, requests for users without a profile would throw an error. Now they return an empty object instead.",
+                "feat: add validation for configuration files\nEnsure that empty or malformed configuration files are detected early and reported with a clear error message.",
+                "refactor: extract token validation into dedicated service\nMoved token validation logic from multiple controllers to a single service to improve maintainability and reduce duplication."
+            ]
+        }
+        else if (examples.length === 0) {
             return ""
         }
 
         return "Examples of good commit messages: \n" + examples.join("\n") + "\n\n"
     }
 
+    private renderInstructionsForPrompt(instructions?: string, fallbackToConventionalCommit?: boolean) {
+        const conventionalCommitInstruction = "Use conventional commits but omit the optional scope. Try to add the WHY aspect to the commit message. The following types for conventional commits are: feat | fix | refactor | docs | test | build | chore | ci. The first line should be maximum of 52 chars, if it is longer then break it into a shorter title and an additional body."
+
+        let finalInstructions = "";
+        // eslint-disable-next-line unicorn/prefer-ternary
+        if(fallbackToConventionalCommit) {
+            finalInstructions = conventionalCommitInstruction;
+        } else {
+            finalInstructions = instructions?.trim() || "";
+        }
+
+        return "User Instructions: " + finalInstructions
+    }
+
     private renderIssueInformationForPrompt(issue?: IssueSummary | null) {
-        if(!issue) {
+        if (!issue) {
             return ""
         }
 
