@@ -1,7 +1,7 @@
 import { SUPPORTED_CONFIG_EXTENSIONS } from "../utils/config/constants.js";
 
-// eslint-disable-next-line perfectionist/sort-union-types
-export type ConfigurationFileExtensionRecommendation = typeof SUPPORTED_CONFIG_EXTENSIONS[number] | (string & {});
+export type ConfigurationFileExtensions = typeof SUPPORTED_CONFIG_EXTENSIONS[number];
+
 export type ConfigurationFileParams = {
     rootDir: string,
     type: "global" | "local",

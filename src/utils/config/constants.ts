@@ -1,8 +1,8 @@
 /**
  * List of supported configuration file extensions.
- * @type {readonly ["js", "json", "yaml", "yml", "toml"]}
+ * @type {readonly ["js", "json", "yaml", "yml", "toml", "mjs", "cjs"]}
  */
-export const SUPPORTED_CONFIG_EXTENSIONS = ["js", "json", "yaml", "yml", "toml"] as const;
+export const SUPPORTED_CONFIG_EXTENSIONS = ["js", "json", "yaml", "yml", "toml", "mjs", "cjs"] as const;
 
 /**
  * Generates a fallback configuration file name for a given config ID.

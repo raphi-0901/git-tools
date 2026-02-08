@@ -1,12 +1,13 @@
-import { dump as yamlDump } from "js-yaml";
+import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 import json2toml from 'json2toml';
 import fs from "node:fs";
 import path from "node:path";
 import terminalLink from "terminal-link";
+import toml from "toml";
 
 import { BaseCommand } from "../../base-commands/BaseCommand.js";
 import {
-    ConfigurationFileExtensionRecommendation,
+    ConfigurationFileExtensions,
     ConfigurationFileParamsForSave
 } from "../../types/ConfigurationFile.js";
 import * as LOGGER from "../logging.js";
@@ -74,46 +75,61 @@ async function writeConfigBasedOnExtension<T extends object>(
     config: T
 ): Promise<void> {
     const dir = path.dirname(configPath);
-    fs.mkdirSync(dir, { recursive: true });
 
-    const ext = path.extname(configPath).slice(1) as ConfigurationFileExtensionRecommendation;
+    try {
+        fs.mkdirSync(dir, { recursive: true });
 
-    // --- JS (ESM) ---
-    if (ext === "js") {
-        try {
-            const fileContents =
-                "// This file was automatically generated\n" +
-                "export default " +
-                JSON.stringify(config, null, 2) +
-                ";\n";
+        const ext = path.extname(configPath).slice(1) as ConfigurationFileExtensions;
 
-            fs.writeFileSync(configPath, fileContents, "utf8");
-            return;
-        } catch (error) {
-            LOGGER.fatal(ctx, `Could not write JS config "${configPath}": ${error}`);
+        switch (ext) {
+            case "cjs":
+            case "js": {
+                const fileContents =
+                    "// This file was automatically generated\n" +
+                    "module.exports = " +
+                    JSON.stringify(config, null, 2) +
+                    ";\n";
+
+                fs.writeFileSync(configPath, fileContents, "utf8");
+                return;
+            }
+
+            case "json": {
+                const jsonString = JSON.stringify(config, null, 2) + "\n";
+                fs.writeFileSync(configPath, jsonString, "utf8");
+                return;
+            }
+
+            case "mjs": {
+                const fileContents =
+                    "// This file was automatically generated\n" +
+                    "export default " +
+                    JSON.stringify(config, null, 2) +
+                    ";\n";
+
+                fs.writeFileSync(configPath, fileContents, "utf8");
+                return;
+            }
+
+            case "toml": {
+                const tomlString = json2toml(config, { indent: 2, newlineAfterSection: true });
+                fs.writeFileSync(configPath, tomlString, "utf8");
+                return;
+            }
+
+            case "yaml":
+            case "yml": {
+                const yamlString = yamlDump(config, { indent: 2 });
+                fs.writeFileSync(configPath, yamlString, "utf8");
+                return;
+            }
+
+            default: {
+                LOGGER.fatal(ctx, `Unsupported config format for saving: ${ext satisfies never}. File: ${configPath}`);
+
+            }
         }
+    } catch (error) {
+        LOGGER.fatal(ctx, `Could not write config "${configPath}": ${error}`);
     }
-
-    // --- JSON ---
-    if (ext === "json") {
-        const jsonString = JSON.stringify(config, null, 2) + "\n";
-        fs.writeFileSync(configPath, jsonString, "utf8");
-        return;
-    }
-
-    // --- YAML ---
-    if (ext === "yaml" || ext === "yml") {
-        const yamlString = yamlDump(config, { indent: 2 });
-        fs.writeFileSync(configPath, yamlString, "utf8");
-        return;
-    }
-
-    // --- TOML ---
-    if (ext === "toml") {
-        const tomlString = json2toml(config, { indent: 2, newlineAfterSection: true });
-        fs.writeFileSync(configPath, tomlString, "utf8");
-        return;
-    }
-
-    LOGGER.fatal(ctx, `Unsupported config format for saving: ${ext}. File: ${configPath}`);
 }
