@@ -302,6 +302,8 @@ export function filterDiffForLLM(diff: string): string {
     let hunkHasChanges = false;
     let oldMode = null;
     let newMode = null;
+    let renameFrom = null;
+    let renameTo = null;
 
     const flushHunk = () => {
         if (inHunk && hunkHasChanges) {
@@ -318,11 +320,17 @@ export function filterDiffForLLM(diff: string): string {
         newMode = null;
     }
 
+    const resetRenameVariables = () => {
+        renameFrom = null;
+        renameTo = null;
+    }
+    
     for (const line of lines) {
         // Start of new hunk
         if (line.startsWith("@@")) {
             flushHunk();
             resetFileModeVariables();
+            resetRenameVariables();
             inHunk = true;
 
             const context = line.replace(/^@@.*@@ ?/, "").trim();
@@ -350,6 +358,19 @@ export function filterDiffForLLM(diff: string): string {
                 }
 
                 continue;
+            }
+
+            if(line.startsWith("rename from")) {
+                renameFrom = line.replace(/^rename from\s+(.+)$/, "$1");
+            }
+
+            if(line.startsWith("rename to")) {
+                renameTo = line.replace(/^rename to\s+(.+)$/, "$1");
+            }
+
+            if(renameFrom && renameTo && renameFrom !== renameTo) {
+                result.push(`Renamed file from ${renameFrom} to ${renameTo}`)
+                resetRenameVariables();
             }
 
             if(line.startsWith("old mode")) {
