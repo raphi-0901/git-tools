@@ -292,6 +292,8 @@ export function filterDiffForLLM(diff: string): string {
     let currentHunk: string[] = [];
     let inHunk = false;
     let hunkHasChanges = false;
+    let oldMode = null;
+    let newMode = null;
 
     const flushHunk = () => {
         if (inHunk && hunkHasChanges) {
@@ -303,10 +305,16 @@ export function filterDiffForLLM(diff: string): string {
         inHunk = false;
     };
 
+    const resetFileModeVariables = () => {
+        oldMode = null;
+        newMode = null;
+    }
+
     for (const line of lines) {
         // Start of new hunk
         if (line.startsWith("@@")) {
             flushHunk();
+            resetFileModeVariables();
             inHunk = true;
 
             const context = line.replace(/^@@.*@@ ?/, "").trim();
@@ -334,6 +342,19 @@ export function filterDiffForLLM(diff: string): string {
                 }
 
                 continue;
+            }
+
+            if(line.startsWith("old mode")) {
+                oldMode = line.replace(/^old mode (\d+)$/, "$1");
+            }
+
+            if(line.startsWith("new mode")) {
+                newMode = line.replace(/^new mode (\d+)$/, "$1");
+            }
+
+            if(oldMode && newMode && oldMode !== newMode) {
+                result.push(`Changed file permissions from ${oldMode} to ${newMode}`)
+                resetFileModeVariables();
             }
 
             continue;
