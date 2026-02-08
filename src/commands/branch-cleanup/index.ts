@@ -43,11 +43,6 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             multipleNonGreedy: false,
             required: false,
         }),
-        'skipTargetSelection': Flags.boolean({
-           aliases: ["skip-target-selection"],
-           description: 'Skip target branch selection. If set, all protected branches will be considered as potential targets.',
-           required: false,
-        }),
         'staleDays': Flags.integer({
             aliases: ['stale-days'],
             default: 30,
@@ -73,6 +68,11 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             min: 1,
             required: false,
         }),
+        'targetSelection': Flags.boolean({
+            aliases: ["target-selection"],
+            description: 'Show a target branch selection. If not set, all protected branches will be considered as potential targets.',
+            required: false,
+        }),
     };
     public readonly configId = "branch-cleanup";
     private _localBranches: Set<string> = new Set();
@@ -87,11 +87,17 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
         staleDaysLocal: 90,
     }
 
-    get localBranchToLastCommitDateCache() { return this._localBranchToLastCommitDateCache; }
+    get localBranchToLastCommitDateCache() {
+        return this._localBranchToLastCommitDateCache;
+    }
 
-    get localBranchToRemoteStatusCache() { return this._localBranchToRemoteStatusCache; }
+    get localBranchToRemoteStatusCache() {
+        return this._localBranchToRemoteStatusCache;
+    }
 
-    get userConfig() { return this._userConfig; }
+    get userConfig() {
+        return this._userConfig;
+    }
 
     async buildCacheForLocalBranches() {
         this.timer.start("cache-build");
@@ -114,7 +120,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             const [branchName, remoteBranchName, commitDate, track] = line.split("|")
             this._localBranchToLastCommitDateCache.set(branchName, Number.parseInt(commitDate, 10) * 1000);
 
-            if(!remoteBranchName) {
+            if (!remoteBranchName) {
                 this._localBranchToRemoteStatusCache.set(branchName, {
                     type: "no-remote"
                 });
@@ -122,7 +128,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             }
 
             const trackingStatus = parseUpstreamTrackLong(track)
-            if(!trackingStatus) {
+            if (!trackingStatus) {
                 continue;
             }
 
@@ -157,14 +163,8 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             selected: this._userConfig.protectedBranchPatterns.some(pattern => pattern.test(branch)),
         }))
 
-        if(this.flags.skipTargetSelection) {
-            return [...formattedRemoteBranches, ...formattedLocalBranches]
-                .filter(branch => branch.selected)
-                .map(branch => branch.branch)
-                .slice(0, 10)
-        }
-
-        const targetSelection = await withPromptExit(this, () => renderCheckboxList({
+        if (this.flags.targetSelection) {
+            const targetSelection = await withPromptExit(this, () => renderCheckboxList({
                 items: [
                     { label: "Local branches", type: "separator" },
                     ...formattedLocalBranches.map(({ branch, selected }) => ({
@@ -187,7 +187,13 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
                 message: "Choose potential target branches: (not more than 10 branches will be considered)",
             }))
 
-        return targetSelection.slice(0, 10)
+            return targetSelection.slice(0, 10)
+        }
+
+        return [...formattedRemoteBranches, ...formattedLocalBranches]
+            .filter(branch => branch.selected)
+            .map(branch => branch.branch)
+            .slice(0, 10)
     }
 
     logTotalTime() {
@@ -261,7 +267,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
             this.spinner.start();
             for (const branch of branchesToDelete) {
                 try {
-                    if(this.flags.dryRun) {
+                    if (this.flags.dryRun) {
                         LOGGER.log(this, `${chalk.red("✗")} Would delete branch ${branch} (dry run).`)
                     } else {
                         await git.deleteLocalBranches(branchesToDelete, true)
@@ -275,7 +281,7 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
 
             this.spinner.stop();
 
-            if(this.flags.dryRun) {
+            if (this.flags.dryRun) {
                 LOGGER.log(this, `${chalk.green("✓")} Would have deleted ${branchesToDelete.length} of ${localBranches.length} branches (dry run).`)
             } else {
                 LOGGER.log(this, `${chalk.green("✓")} Successfully deleted ${branchesToDelete.length} of ${localBranches.length} branches!`);
