@@ -11,6 +11,7 @@ import { analyzeBranches } from "../../utils/branchAnalyzer.js";
 import { isProtectedBranch, protectedBranchPatterns } from "../../utils/branchProtection.js";
 import { promptBranchesToDelete } from "../../utils/branchSelection.js";
 import { getBranchesSummary } from "../../utils/branchSummary.js";
+import { checkIfInGitRepository } from "../../utils/checkIfInGitRepository.js";
 import { getRemoteNames } from "../../utils/getRemoteNames.js";
 import { getSimpleGit } from "../../utils/getSimpleGit.js";
 import * as LOGGER from "../../utils/logging.js";
@@ -196,6 +197,8 @@ export default class BranchCleanupCommand extends CommonFlagsBaseCommand<typeof 
     async run() {
         this.timer.start("total");
         this.spinner.start();
+        await checkIfInGitRepository(this);
+
         this.storeFlagsIntoUserConfig()
 
         const git = getSimpleGit();
