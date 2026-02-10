@@ -37,17 +37,19 @@ async function diffFilesPerType(params: DiffAnalyzerParams): Promise<FilesPerDif
     const deletedFiles = new Set<string>();
 
     for (const line of nameStatus.split("\n").filter(Boolean)) {
-        const match = line.trim().match(/^(\S+)\s+(.+)$/);
+        const match = line.trim().match(/^(\S+)\s+(.+?)(?:\s+(.+))?$/);
         if (!match) {
             continue;
         }
 
-        const [, status, name] = match;
+        const [, status, oldName, newName] = match;
 
         if (status === "D") {
-            deletedFiles.add(name);
+            deletedFiles.add(oldName);
+        } else if(status.startsWith("R")){
+            nonRemovedFilesToStatusMap.set(`${oldName} ${newName}`, status);
         } else {
-            nonRemovedFilesToStatusMap.set(name, status);
+            nonRemovedFilesToStatusMap.set(oldName, status);
         }
     }
 
@@ -65,10 +67,16 @@ async function diffFilesPerType(params: DiffAnalyzerParams): Promise<FilesPerDif
     const diffBlocks = fullDiff.split(/^diff --git /m).filter(Boolean);
 
     for (const block of diffBlocks) {
-        const match = block.match(/^a\/(.+?) b\/.+$/m);
+        const match = block.match(/^a\/(.+?) b\/(.+)$/m);
         if (match) {
-            const filename = match[1];
-            fileDiffs.set(filename, `diff --git ${block}`);
+            const oldFileName = match[1];
+            const newFileName = match[2];
+
+            if(oldFileName === newFileName) {
+                fileDiffs.set(`${oldFileName}`, `diff --git ${block}`);
+            } else {
+                fileDiffs.set(`${oldFileName} ${newFileName}`, `diff --git ${block}`);
+            }
         }
     }
 
@@ -294,6 +302,8 @@ export function filterDiffForLLM(diff: string): string {
     let hunkHasChanges = false;
     let oldMode = null;
     let newMode = null;
+    let renameFrom = null;
+    let renameTo = null;
 
     const flushHunk = () => {
         if (inHunk && hunkHasChanges) {
@@ -310,11 +320,17 @@ export function filterDiffForLLM(diff: string): string {
         newMode = null;
     }
 
+    const resetRenameVariables = () => {
+        renameFrom = null;
+        renameTo = null;
+    }
+    
     for (const line of lines) {
         // Start of new hunk
         if (line.startsWith("@@")) {
             flushHunk();
             resetFileModeVariables();
+            resetRenameVariables();
             inHunk = true;
 
             const context = line.replace(/^@@.*@@ ?/, "").trim();
@@ -342,6 +358,19 @@ export function filterDiffForLLM(diff: string): string {
                 }
 
                 continue;
+            }
+
+            if(line.startsWith("rename from")) {
+                renameFrom = line.replace(/^rename from\s+(.+)$/, "$1");
+            }
+
+            if(line.startsWith("rename to")) {
+                renameTo = line.replace(/^rename to\s+(.+)$/, "$1");
+            }
+
+            if(renameFrom && renameTo && renameFrom !== renameTo) {
+                result.push(`Renamed file from ${renameFrom} to ${renameTo}`)
+                resetRenameVariables();
             }
 
             if(line.startsWith("old mode")) {
