@@ -2,7 +2,7 @@
 
 Install the CLI globally:
 ```bash
-npm install -g git-tools
+npm install -g @rwirnsberger/git-tools
 ```
 
 ---
