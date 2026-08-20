@@ -56,8 +56,13 @@ export class LLMChat {
      * Get Rate Limit Token Info for this client.
      */
     async getRemainingTokens(model = STANDARD_LLM_MODEL) {
-        const response = await this.client.responses
-            .create({ input: "ping", model })
+        const response = await this.client.chat.completions
+            .create({
+                // eslint-disable-next-line camelcase
+                max_tokens: 1,
+                messages: [{ content: "ping", role: "user" }],
+                model,
+            })
             .withResponse();
 
         this._remainingTokens = this.getRemainingTokensFromHeader(response.response);
