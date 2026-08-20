@@ -417,10 +417,11 @@ export const TextArea = ({ defaultValue, height = 6, onChange }: InkFormProps) =
     }
 
     const initialLines = getInitialLines(defaultValue);
+    const lastLineWithContent = initialLines.findLastIndex(line => line !== "");
     const [state, dispatch] = useReducer(reducer, {
-        cursor: initialLines[0]?.length || 0,
-        lastCursorPosition: initialLines[0]?.length || 0,
-        lineIndex: 0,
+        cursor: lastLineWithContent === -1 ? 0 : initialLines[lastLineWithContent].length,
+        lastCursorPosition: lastLineWithContent === -1 ? 0 : initialLines[lastLineWithContent].length,
+        lineIndex: lastLineWithContent === -1 ? initialLines.length - 1 : lastLineWithContent,
         lines: initialLines,
         scrollTop: 0
     });
