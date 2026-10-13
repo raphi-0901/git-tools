@@ -254,14 +254,26 @@ function shouldIncludeFile(file: string, ignorePatterns: string[] = [
     "build/**",
     "node_modules/**",
 ]): boolean {
-    return !ignorePatterns.some(pattern => {
-        if (pattern.includes("*")) {
-            const regex = new RegExp("^" + pattern.replaceAll('**', ".*").replaceAll('*', "[^/]*") + "$");
-            return regex.test(file);
-        }
+    return !ignorePatterns.some(pattern => globToRegex(pattern).test(file));
+}
 
-        return file === pattern;
-    });
+/**
+ * Converts a glob pattern into a regex that matches at any directory depth,
+ * so patterns like "package-lock.json" or "dist/**" also apply to nested packages in monorepos.
+ *
+ * @param {string} pattern - Glob pattern supporting "*" and "**".
+ * @returns {RegExp} Regex matching file paths relative to the repository root.
+ */
+function globToRegex(pattern: string): RegExp {
+    const body = pattern
+        .split("**")
+        .map(part => part
+            .split("*")
+            .map(segment => segment.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`))
+            .join("[^/]*"))
+        .join(".*");
+
+    return new RegExp(`^(?:.*/)?${body}$`);
 }
 
 /**
